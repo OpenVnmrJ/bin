@@ -1,0 +1,35 @@
+*********************** VARIAN NMR USER GROUP LIBRARY ***********************
+                              NEW MANUAL ENTRY
+
+jeoltovar	Convert JEOL data to VNMR format and retrieve
+
+Syntax:		jeoltovar<(JEOLfilename<,JEOLfilename_2>)>
+		  where JEOLfilename is the file name WITHOUT any extension;
+		  files names JEOLfilename.GXP (or .gxp) and
+		  JEOLfilename.GXD (or .gxd) should exist
+		if no argument is supplied, the macro will ask for the name;
+		for phase-sensitive 2D spectra (States-Haberkorn), two
+		filenames must be supplied (no interactive mode).
+
+Description:	Converts JEOL data to VNMR format and reads it into the
+		current experiment. This program has been tested with data
+		from a GSX-270 and an EX-400, both with PDP11 computers (?).
+		JEOL data consist of two files: a data file with a '.GXD'
+		extension and a parameter file with a '.GXP' extension.
+		JEOL data files are simply binary data. The parameter file
+		conversion may be only partially correct and may not work
+		for other versions of JEOL software, but it is implemented
+		as a MAGICAL macro and hence easily accessible to user
+		modification. For example, on two different JEOL
+		spectrometers, the observe frequency is OFR on one and
+		OBFRQ on the other.
+
+		If you use ftp to transfer data from JEOL to Sun, it is
+		ESSENTIAL to copy the GXP file in the default ASCII mode
+		and then change to BINARY mode to copy the GXD file.
+
+		If transferring data to the Sun via Sun DNI (DecNET)
+		(initiating the transfer at the Sun), *.GXP files must be
+		copied in the normal mode, whereas *.GXD files MUST be
+		copied with the -v (verbatim) option of the dnicp command.
+		Sun DNI software converts all filenames to lower case.

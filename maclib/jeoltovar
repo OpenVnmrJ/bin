@@ -1,0 +1,759 @@
+" jeoltovar - converts jeol data to varian format  		"
+"    Usage: jeoltovar<('jeol_filename'<,'jeol_filename2'>)>	"
+"    Examples:  jeoltovar('43BO1')				"
+"		jeoltovar					"
+"		jeoltovar('43B01A','43B01B')			"
+"    JEOL filenames need to be supplied without extensions	"
+
+" David S. Stephenson        Munich November 1992		"       
+" 93-02-17  Rolf Kyburz (enhancements)            		"
+" 93-03-08  Rolf Kyburz (reestablished EX compatibility)	"
+
+$name=''
+if $#<1 then
+   input('enter JEOL file name without extension: '):$name
+else
+   $name=$1
+endif
+if $#>1 then
+   $name=$1
+   $name2=$2
+   $ph2d=1
+   " The name of the conversion program "
+   $bin=userdir+'/../bin/jeoltovar2'
+   exists($bin,'file'):$e
+   if not($e) then
+     $bin='/vnmr/bin/jeoltovar2'
+     exists($bin,'file'):$e
+     if not($e) then
+       write('error','jeoltovar: program bin/jeoltovar2 not found, exiting.')
+       return
+     endif
+   endif
+else
+   $ph2d=0
+   $name2=''
+   " The name of the conversion program "
+   $bin=userdir+'/../bin/jeoltovar' 
+   exists($bin,'file'):$e
+   if not($e) then 
+     $bin='/vnmr/bin/jeoltovar'
+     exists($bin,'file'):$e 
+     if not($e) then 
+       write('error','jeoltovar: program bin/jeoltovar not found, exiting.') 
+       return 
+     endif 
+   endif
+endif
+$vnmrpar=userdir+'/parlib/jeol.par'
+exists($vnmrpar,'directory'):$e
+if not($e) then
+   $vnmrpar='/vnmr/parlib/jeol.par'
+   exists($vnmrpar,'directory'):$e
+   if not($e) then
+     write('error','jeoltovar: parlib/jeol.par not found, exiting.')
+     return
+   endif
+endif
+
+" Initialize text variables "
+$date=''
+$dn=''
+$tn=''
+$solvent=''
+$text=''
+$incpar=''
+$incmode=''
+
+" Kick out the old fid "
+shell('rm -f',curexp+'/acqfil/fid')
+
+" check for parameter (*.GXP) and data (*.GXD) files "
+$parfile=$name+'.GXP'
+exists($parfile,'file'):$exists
+if not $exists then
+   $parfile=$name+'.gxp'
+   exists($parfile,'file'):$exists
+endif
+if not $exists then
+   write('error','File %s.GXP does not exist',$name)
+   return
+endif
+$datafile=$name+'.GXD'
+exists($datafile,'file'):$exists
+if not $exists then
+   $datafile=$name+'.gxd'
+   exists($datafile,'file'):$exists
+endif
+if not $exists then
+   write('error','File %s.GXD does not exist',$name)
+   return
+endif
+if $ph2d then
+   " for phase-sensitive 2D spectra the file $name2.gxp is NOT USED "
+   $datafile2=$name2+'.GXD'
+   exists($datafile2,'file'):$exists
+   if not $exists then
+      $datafile2=$name2+'.gxd'
+      exists($datafile2,'file'):$exists
+   endif
+   if not $exists then
+      write('error','File %s.GXD does not exist',$name2)
+      return
+   endif
+endif
+
+
+"***************************************************"
+" Start looking up information in a Jeol 'GXP' file "
+"***************************************************"
+" parameters in the JEOL parameter set are ordered alphabetically; "
+" pattern matching can encounter troubles with parameters that can "
+" contain arbitrary character sequences, especially since pattern  "
+" matching is not case-specific. Such parameters are COMNT         "
+" (comment), EXPCM (an experimental description parameter) and     "
+" OPRTR (operator name). For parameters that appear behind COMNT,  "
+" that parameter and its value are skipped first; if a parameter   "
+" appears behind EXPCM, that parameter and its value are skipped   "
+" first, for parameters behind OPRTR, OPRTR (if it exists) and its "
+" value are skipped first					   "
+clear
+
+" determine whether to skip OPRTR (as some customers may have fudged	"
+" the JEOL software to also put OPRTR into the *.GXP disk file), which	"
+" may cause troubles with lookup, because it can contain arbitrary text	"
+lookup('file',$parfile,'count','OPRTR'):$oprtrcount
+
+"************************************************************"
+" read parameters that are required to convert the data file "
+"************************************************************"
+" SAMPO is corresponding to our np; the number of data points stored	"
+" is POINT, which is always a power of 2; we want to compress the VNMR	"
+" fid file such that is doesn't include zeroes at the end of each trace	"
+lookup('file',$parfile,'count','SAMPO'):$sampocount
+if $sampocount then
+   lookup('file',$parfile,'count','SPO'):$spocount
+else
+   $spocount=0
+endif
+lookup('file',$parfile,'seek','EXPCM','readline')
+if $oprtrcount>0 then
+   lookup('seek','OPRTR','readline')
+endif
+lookup('seek','POINT','read'):$pts
+if $sampocount then
+   lookup('seek','SAMPO','read'):$np
+else
+   if $spocount then
+      lookup('seek','SPO','read'):$np
+   else
+      $np=$pts
+   endif
+endif
+
+"************************"
+" check if it's 1D or 2D "
+"************************"
+" If $acblk is non-zero, then its a 2D fid (ACBLK being the number of	"
+" 2D increments), otherwise the data could be a simple 1D, or an array	"
+" of 1D spectra, in which case the name of the arrayed parameter and	"
+" its values will have to extracted from the parameter file header.	"
+$acblk=0
+lookup('file',$parfile,'count','ACBLK'):$acblkcount
+if $acblkcount then
+  lookup('file',$parfile,'seek','ACBLK','read'):$acblk
+endif
+$2d=0
+if $acblk>0 then
+   $arraydim=$acblk
+   $2d=1
+else
+   $arraydim=1
+endif
+lookup('file',$parfile,'skip',2,'read',4):$incpar,$incmode,$increments,$elem
+if ($acblk=0)and($increments>1) then
+   $arraydim=$increments
+   if $incmode='LINAR' then
+     $2d=1
+   endif
+endif
+
+"******************************************************"
+" Conversion of the JEOL fid using /vnmr/bin/jeoltovar "
+"******************************************************"
+" The 'fread' commands get standard parameters for	"
+" 1D and 2D JEOL experiments				"
+fread($vnmrpar+'/procpar')
+fread($vnmrpar+'/procpar','processed')
+if ($arraydim=1)and($ph2d<0.5) then  " non-arrayed 1D experiment "
+   shell($bin,$datafile,curexp+'/acqfil/fid',1,$np,' 2>&1 ')
+else  " arrayed "
+   if $ph2d then
+      shell($bin,$datafile,$datafile2,curexp+'/acqfil/fid',
+		$arraydim,$np,$pts,' 2>&1 ')
+      exists('phase','parameter'):$exists
+      if not $exists then
+         create('phase','integer')
+      endif
+      setvalue('phase',1,1)
+      setvalue('phase',2,2)
+      exists('phase','parameter','processed'):$exists
+      if not $exists then
+         create('phase','integer','processed')
+      endif
+      setvalue('phase',1,1,'processed')
+      setvalue('phase',2,2,'processed')
+      setvalue('array','phase')
+      setvalue('array','phase','processed')
+   else
+      shell($bin,$datafile,curexp+'/acqfil/fid',$arraydim,$np,$pts,' 2>&1 ')
+      setvalue('phase',1,0)
+      setvalue('phase',1,0,'processed')
+      off('phase') off('phase','processed')
+   endif
+   lookup('file',$parfile,'seek','CLFRQ','read'):$sw1
+   if $ph2d then
+      setvalue('arraydim',2*$arraydim)
+      setvalue('arraydim',2*$arraydim,'processed')
+   else
+      setvalue('arraydim',$arraydim)
+      setvalue('arraydim',$arraydim,'processed')
+   endif
+   if $2d or $ph2d then
+      setvalue('ni',$arraydim)
+      setvalue('ni',$arraydim,'processed')
+      setvalue('sw1',$sw1)
+      setvalue('sw1',$sw1,'processed')
+   endif
+endif
+setvalue('np',$np)
+setvalue('np',$np,'processed')
+
+
+"************************************************************************"
+"************************************************************************"
+" Read parameters from the GXP file and put them into curpar and procpar "
+"************************************************************************"
+"************************************************************************"
+" The set of converted parameters includes:				"
+"   - sample-related parameters:					"
+"	solvent (SLVNT), loc (SPLNO), temp (CTEMP/TEMP.)		"
+"   - frequency-related parameters:					"
+"	tn (OBNUC), sfrq (OFR/OBFRQ,OBSET,OBFIN), tof (OBFIN),		"
+"	dn (IRNUC), dfrq (IFR/IRFRQ,IRSET,IRFIN), dof (IRFIN)		"
+"   - basic experimental parameters:					"
+"	pslabel (EXMOD), d1 (PD), pw (PW1), rof1 (PREDL),		"
+"	rof2 (DET/DEADT)						"
+"   - parameters related to the acquisition:				"
+"	sw (FREQU), np (SPO/SAMPO), fb (FLT/FILTR), gain (RGAIN),	"
+"	nt (TIMES), ct (SCANS), ss (DUMMY/INDMY), spin (CSPED/SPEED),	"
+"	at (ACQTM), gain (RGAIN), pad (IWT/INIWT)			"
+"   - 2D parameters (set in the section above):				"
+"	ni (arraydim), sw1 (CLFRQ)					"
+"   - other parameters:							"
+"	date (taken from SunOS, hence only the date of conversion),	"
+"	file (set to the name of the VNMR fid file)			"
+"									"
+
+"*******************************************************************"
+" for the next set of parameters the Jeol keywords are not unique;  "
+" IFR, OFR, CTEMP, FLT, SPO, DET, IWT and CSPED are specific to the "
+" EX series of instruments (corresponding to IRFRQ, OBFRQ, TEMP.,   "
+" FILTR, SAMPO, DEADT, INIWT and SPEED parameters on the GX/GSX.    "
+"*******************************************************************"
+lookup('file',$parfile,'count','IRFRQ'):$irfrqcount
+if $irfrqcount=0 then 
+   lookup('file',$parfile,'count','IFR'):$ifrcount
+else
+   $ifrcount=0
+endif
+lookup('file',$parfile,'count','OBFRQ'):$obfrqcount
+if $obfrqcount=0 then 
+   lookup('file',$parfile,'count','OFR'):$ofrcount
+else
+   $ofrcount=0
+endif
+lookup('file',$parfile,'count','CTEMP'):$ctempcount
+if $ctempcount=0 then
+   lookup('file',$parfile,'count','TEMP.'):$tempcount
+else
+   $tempcount=0
+endif
+lookup('file',$parfile,'count','FILTR'):$filtrcount
+if $filtrcount=0 then
+   lookup('file',$parfile,'count','FLT'):$fltcount
+else
+   $fltcount=0
+endif
+lookup('file',$parfile,'count','DEADT'):$deadtcount
+if $deadtcount=0 then
+   lookup('file',$parfile,'count','DET'):$detcount
+else
+   $detcount=0
+endif
+lookup('file',$parfile,'count','INIWT'):$iniwtcount
+if $iniwtcount=0 then
+   lookup('file',$parfile,'count','IWT'):$iwtcount
+else
+   $iwtcount=0
+endif
+lookup('file',$parfile,'count','SPEED'):$speedcount
+if $speedcount=0 then
+   lookup('file',$parfile,'count','CSPED'):$cspedcount
+else
+   $cspedcount=0
+endif
+
+"*******************************************************************"
+" Now check whether remaining parameters are present                "
+" (parameters in back-converted files from newer instruments may be "
+"  very scarse! In these cases we need to provide suitable defaults "
+"*******************************************************************"
+lookup('file',$parfile,'count','ACQTM'):$acqtmcount
+lookup('file',$parfile,'count','COMNT'):$comntcount
+"lookup('file',$parfile,'count','CSPED'):$cspedcount"
+"lookup('file',$parfile,'count','CTEMP'):$ctempcount"
+"lookup('file',$parfile,'count','DEADT'):$deadtcount"
+"lookup('file',$parfile,'count','DET'):$detcount"
+lookup('file',$parfile,'count','DUMMY'):$dummycount
+lookup('file',$parfile,'count','EXMOD'):$exmodcount
+lookup('file',$parfile,'count','EXPCM'):$expcmcount
+"lookup('file',$parfile,'count','FILTR'):$filtrcount"
+"lookup('file',$parfile,'count','FLT'):$fltcount"
+lookup('file',$parfile,'count','FREQU'):$frequcount
+"lookup('file',$parfile,'count','IFR'):$ifrcount"
+lookup('file',$parfile,'count','INDMY'):$indmycount
+"lookup('file',$parfile,'count','INIWT'):$iniwtcount"
+lookup('file',$parfile,'count','IRFIN'):$irfincount
+"lookup('file',$parfile,'count','IRFRQ'):$irfrqcount"
+lookup('file',$parfile,'count','IRNUC'):$irnuccount
+lookup('file',$parfile,'count','IRSET'):$irsetcount
+"lookup('file',$parfile,'count','IWT'):$iwtcount"
+lookup('file',$parfile,'count','OBFIN'):$obfincount
+"lookup('file',$parfile,'count','OBFRQ'):$obfrqcount"
+lookup('file',$parfile,'count','OBSET'):$obsetcount
+lookup('file',$parfile,'count','OBNUC'):$obnuccount
+"lookup('file',$parfile,'count','OFR'):$ofrcount"
+lookup('file',$parfile,'count','OPRTR'):$oprtrcount"
+lookup('file',$parfile,'count','PD'):$pdcount
+lookup('file',$parfile,'count','PREDL'):$predlcount
+lookup('file',$parfile,'count','PW1'):$pw1count
+lookup('file',$parfile,'count','RGAIN'):$rgaincount
+lookup('file',$parfile,'count','SCANS'):$scanscount
+lookup('file',$parfile,'count','SLVNT'):$slvntcount
+"lookup('file',$parfile,'count','SPEED'):$speedcount"
+lookup('file',$parfile,'count','SPLNO'):$splnocount
+"lookup('file',$parfile,'count','TEMP.'):$tempcount"
+lookup('file',$parfile,'count','TIMES'):$timescount
+
+"********************************"
+" Fill in initial default values "
+"********************************"
+$ct=0
+$d1=0
+$dfrq=0
+$dkhz=0
+$dof=0
+$fb=0
+$gain=-2e6
+$loc=0
+$nt=4
+$okhz=0
+$pad=0
+$pslabel='jeol'
+$pw=0
+$rof1=0
+$rof2=0
+$sfrq=400
+$spin=-10
+$ss=0
+$ss2d=0
+$sw=0
+$temp=-3000
+$tof=0
+
+"******************************************************************"
+" extracting parameter values from the JEOL parameter (*.GXP) file "
+"******************************************************************"
+" NOTE: we are seeking in STRICTLY ALPHABETICAL order and don't	   "
+" start seeking through the entire file every time; be careful	   "
+" when adding new parameters into the seek sequence!		   "
+if $acqtmcount then
+  lookup('file',$parfile,'seek','ACQTM','read'):$at	" ACQTM "
+endif
+if $comntcount then
+  lookup('seek','COMNT','readline')			" skip COMNT "
+endif
+if $cspedcount then
+   lookup('seek','CSPED','read'):$spin			" CSPED (EX) "
+endif
+if $ctempcount then
+   lookup('seek','CTEMP','read'):$temp			" CTEMP (EX) "
+endif
+if $deadtcount then
+   lookup('seek','DEADT','read'):$rof2			" DEADT (GX/GSX) "
+endif
+if $detcount then
+   lookup('seek','DET','read'):$rof2			" DET (EX) "
+endif
+if $dummycount then
+  lookup('seek','DUMMY','read'):$ss			" DUMMY "
+endif
+if $exmodcount then
+  lookup('seek','EXMOD','read'):$pslabel		" EXMOD "
+endif
+if $expcmcount then
+  lookup('seek','EXPCM','readline')			" skip EXPCM "
+endif
+if $filtrcount then
+   lookup('seek','FILTR','read'):$fb			" FILTR (GX/GSX) "
+endif
+if $fltcount then
+   lookup('seek','FLT','read'):$fb			" FLT (EX) "
+endif
+if $frequcount then
+  lookup('seek','FREQU','read'):$sw			" FREQU "
+endif
+if $ifrcount then
+   lookup('seek','IFR','read'):$dfrq			" IFR (EX) "
+endif
+if $indmycount then
+  lookup('seek','INDMY','read'):$ss2d			" INDMY "
+endif
+if $iniwtcount then
+   lookup('seek','INIWT','read'):$pad			" INIWT (GX/GSX) "
+endif
+if $irfincount then
+  lookup('seek','IRFIN','read'):$dof			" IRFIN "
+endif
+if $irfrqcount then
+   lookup('seek','IRFRQ','read'):$dfrq			" IRFRQ (GX/GSX) "
+endif
+if $irnuccount then
+  lookup('seek','IRNUC','read'):$dn			" IRNUC "
+endif
+if $irsetcount then
+  lookup('seek','IRSET','read'):$dkhz			" IRSET "
+endif
+if $iwtcount then
+   lookup('seek','IWT','read'):$pad			" IWT (EX) "
+endif
+if $obfincount then
+  lookup('seek','OBFIN','read'):$tof			" OBFIN "
+endif
+if $obfrqcount then
+   lookup('seek','OBFRQ','read'):$sfrq			" OBFRQ (GX/GSX) "
+endif
+if $obnuccount then
+  lookup('seek','OBNUC','read'):$tn			" OBNUC "
+endif
+if $obsetcount then
+  lookup('seek','OBSET','read'):$okhz			" OBSET "
+endif
+if $ofrcount then
+   lookup('seek','OFR','read'):$sfrq			" OFR (EX) "
+endif
+if $oprtrcount then
+   lookup('seek','OPRTR','readline')			" skip OPRTR "
+endif
+if $pdcount then
+  lookup('seek','PD','read'):$d1			" PD "
+endif
+if $predlcount then
+  lookup('seek','PREDL','read'):$rof1			" PREDL "
+endif
+if $pw1count then
+  lookup('seek','PW1','read'):$pw			" PW1 "
+endif
+if $rgaincount then
+  lookup('seek','RGAIN','read'):$gain			" RGAIN "
+endif
+if $scanscount then
+  lookup('seek','SCANS','read'):$ct			" SCANS "
+endif
+if $slvntcount then
+  lookup('seek','SLVNT','read'):$solvent		" SLVNT "
+endif
+if $speedcount then
+   lookup('seek','SPEED','read'):$spin			" SPEED (GX/GSX) "
+endif
+if $splnocount then
+   lookup('seek','SPLNO','read'):$loc			" SPLNO "
+endif
+if $tempcount then
+   lookup('seek','TEMP.','read'):$temp			" TEMP. (GX/GSX) "
+endif
+if $timescount then
+  lookup('seek','TIMES','read'):$nt			" TIMES "
+endif
+
+if $ct=0 then $ct=$nt endif
+
+$tnv1='' $tnv2=''
+length($tn):$tnlen
+substr($tn,$tnlen,1):$tnv1
+substr($tn,1,$tnlen-1):$tnv2
+$tn=$tnv1+$tnv2
+
+$dnv1='' $dnv2=''
+length($dn):$dnlen
+substr($dn,$dnlen,1):$dnv1
+substr($dn,1,$dnlen-1):$dnv2
+$dn=$dnv1+$dnv2
+
+$sfrq=$sfrq+$okhz/1000+$tof/1e6
+$dfrq=$dfrq+$dkhz/1000+$dof/1e6
+if (dfrq=0)and($tn='H1') then
+  if $dn='C13' then
+    $dfrq=$sfrq/4
+  else
+    if $dn='H1' then
+      $dfrq=$sfrq
+    endif
+  endif
+endif
+if ($tn='C13')and(($dn='C13')or($dn='H1')) then
+   $dn='H1' $dfrq=$sfrq/0.251450139978
+endif
+
+if ($at=0)and($sw>0)and($np>0) then
+  $at=$np/(2*$sw)
+endif
+
+if $fb=0 then
+  $fb=1.15*$sw/2
+  $fb=1000*trunc($fb/1000)
+endif
+
+if $rof2>0 then
+  $alfa=-$rof2
+else
+  $alfa=0
+endif
+
+if $2d or $ph2d then
+  $seqfil='jeol'
+else
+  $seqfil='s2pul'
+endif
+
+" there is no JEOL timestamp parameter - use the current date from UNIX "
+" (the DATIM does not seem to reliably reflect the time of acquisition) "
+shell('date \'+%Y-%m-%d %H:%M\''):$date
+
+"***********************************************************************"
+" setting the values in the Varian current & processed parameter trees	"
+"***********************************************************************"
+" parameters that cause macros to execute (which will affect other	"
+" parameters) as well as the parameters in the processed tree are set	"
+" with the 'setvalue' command rather than directly.	    		"
+setvalue('at',$at)		setvalue('at',$at,'processed')
+setvalue('rof2',$rof2)		setvalue('rof2',$rof2,'processed')
+setvalue('alfa',-$alfa)		setvalue('alfa',$alfa,'processed')
+setvalue('pslabel',$pslabel)	setvalue('pslabel',$pslabel,'processed')
+setvalue('seqfil',$seqfil)	setvalue('seqfil',$seqfil,'processed')
+setvalue('sw',$sw)		setvalue('sw',$sw,'processed')
+if ($ss2d>0)and($arraydim>1) then $ss=-$ss2d endif
+setvalue('ss',$ss)		setvalue('ss',$ss,'processed')
+setvalue('pad',$pad)		setvalue('pad',$pad,'processed')
+setvalue('date',$date)		setvalue('date',$date,'processed')
+setvalue('dof',$dof)		setvalue('dof',$dof,'processed')
+convertnuc($dn):$dn
+setvalue('dn',$dn)		setvalue('dn',$dn,'processed')
+setvalue('tof',$tof)		setvalue('tof',$tof,'processed')
+convertnuc($tn):$tn
+setvalue('tn',$tn)		setvalue('tn',$tn,'processed')
+setvalue('d1',$d1)		setvalue('d1',$d1,'processed')
+$rof1=1000*$rof1
+setvalue('rof1',$rof1)		setvalue('rof1',$rof1,'processed')
+setvalue('pw',$pw)		setvalue('pw',$pw,'processed')
+setvalue('pw90',0)              setvalue('pw90',0,'processed')
+if $gain>-1e6 then
+  gain='y' on('gain','processed')
+  setvalue('gain',$gain)	setvalue('gain',$gain,'processed')
+else
+  setvalue('gain',0)		setvalue('gain',0,'processed')
+  off('gain') off('gain','processed')
+endif
+setvalue('nt',$nt)		setvalue('nt',$nt,'processed')
+setvalue('solvent',$solvent)	setvalue('solvent',$solvent,'processed')
+if $spin>-1 then
+  spin='y' on('spin','processed')
+  setvalue('spin',$spin)		setvalue('spin',$spin,'processed')
+else
+  setvalue('spin',0)		setvalue('spin',0,'processed')
+  off('spin') off('spin','processed')
+endif
+setvalue('dp','y')		setvalue('dp','y','processed')
+setvalue('p1',0)		setvalue('p1',0,'processed')
+setvalue('d2',0)		setvalue('d2',0,'processed')
+off('bs') off('bs','processed')
+setvalue('file',$name)		setvalue('file',$name,'processed')
+setvalue('dfrq',$dfrq)		setvalue('dfrq',$dfrq,'processed')
+setvalue('sfrq',$sfrq)		setvalue('sfrq',$sfrq,'processed')
+if $temp > -2000 then
+  temp='y' on('temp','processed')
+  setvalue('temp',$temp)	setvalue('temp',$temp,'processed')
+else
+  off('temp') off('temp','processed')
+endif
+setvalue('fb',$fb)		setvalue('fb',$fb,'processed')
+if $splnocount then
+   loc=$loc
+   exists('loc','parameter','processed'):$e
+   if $e then
+     on('loc','processed') setvalue('loc',$loc,'processed')
+   endif
+endif
+" set 'file' parameter to the name of the VNMR fid file "
+setvalue('file',$name)		setvalue('file',$name,'processed')
+
+"***********************************************************************"
+" For the case of arrayed 1D data set the array parameter		"
+" and extract the array values into an appropriate arrayed parameter	"
+"***********************************************************************"
+if ($arraydim>1)and($2d<0.5)and($ph2d<0.5) then  " arrayed 1D data "
+   ai
+   setvalue('aig','ai','processed')
+   if $incmode='INDIV' then
+      $scaling=1
+      if $incpar='IRFIN' then  " decoupler frequency array "
+	 $array='dof'
+      else
+         $startcmd=''
+         substr($incpar,1,2):$startcmd
+	 if $startcmd='PI' then  " arrayed delay; use d2 "
+	    $array='d2'
+	    $scaling=.001
+	 else
+	    if $startcmd='PW' then  " arrayed pulse; use pw "
+	       $array='pw'
+	    else
+	       if $startcmd='LO' then  " arrayed loop (integer parameter) "
+	          shell('echo',$incpar,' | tr \'A-Z\' \'a-z\'; cat'):$parname
+		  exists($parname,'parameter'):$exists
+		  if not $exists then
+	             create($parname,'integer')
+		  endif
+		  exists($parname,'parameter','processed'):$exists
+		  if not $exists then
+	             create($parname,'integer','processed')
+		  endif
+	          $array=$parname
+		  " assuming the experiment is a T2 analysis, secure PI1 "
+                  lookup('file',$parfile,'seek','EXPCM','readline')
+		  if $oprtrcount>0 then
+		     lookup('seek','OPRTR','readline')
+		  endif
+	          lookup('seek','PI1','read'):$d2
+	          setvalue('d2',$d2) setvalue('d2',$d2,'processed')
+	       else  " other arrays; create arrayed parameter "
+	          shell('echo',$incpar,' | tr \'A-Z\' \'a-z\'; cat'):$parname
+		  exists($parname,'parameter'):$exists
+		  if not $exists then
+	             create($parname,'real')
+		  endif
+		  exists($parname,'parameter','processed'):$exists
+		  if not $exists then
+	             create($parname,'real','processed')
+		  endif
+	          $array=$parname
+	       endif
+	    endif
+         endif
+      endif
+      setvalue('array',$array) setvalue('array',$array,'processed')
+      lookup('file',$parfile,'skip',6)
+      $ix=1
+      repeat
+         lookup('read'):$value
+         $value=$scaling*$value
+	 setvalue($array,$value,$ix) setvalue($array,$value,$ix,'processed')
+         $ix=1+$ix
+      until $ix>$increments
+   endif
+endif
+
+
+
+"##########################################"
+" customized features could be placed here "
+"##########################################"
+
+" convert solvent name to VNMR standard value "
+setprotect('solvent','on',8) solvent=solvent
+setprotect('solvent','on',8,'processed')
+setvalue('solvent',solvent,'processed')
+
+" some parameter changes may cause ct to be reset - we just set it last "
+setvalue('ct',$ct)		setvalue('ct',$ct,'processed')
+
+"**************************************"
+" select default processing parameters "
+"**************************************"
+fn=2*np
+proc='ft'
+if $2d or $ph2d then
+   if($tn=$dn) then
+      axis='pp'
+   else
+      axis='pd'
+   endif
+   proc1='ft'
+   if $ph2d then
+      sb=-at sbs=-at
+      sb1=-ni/sw1 sbs1=-ni/sw1
+      lb='n' lb1='n'
+      gf='n' gf1='n'
+      awc='n' awc1='n'
+      ph
+   else
+      sinebell
+      av
+   endif
+   fn1=32
+   repeat
+      fn1=2*fn1
+   until fn1>=4*$arraydim
+endif
+
+" display parameters (should be disabled if output from /vnmr/bin/jeoltovar "
+"	is to be retained (dg clears the alphanumeric window)		    "
+dg
+" switch to full display "
+f full
+
+"****************************************************************"
+" read comment, put it into the text file (and display the text) "
+"****************************************************************"
+lookup('file',$parfile,'seek','COMNT','readline'):$text
+text($text)
+
+"*************************************"
+" save fid in disk file (if possible) "
+"*************************************"
+exists(curexp+'/acqfil/fid','file'):$exists
+if $exists then
+   $fid=1
+else
+   $fid=0
+endif
+if $fid then
+   exists($name+'.fid','file'):$exists
+   if $exists then
+      write('error',
+	'VNMR fid file %s already exists - file has not been stored',
+		   $name+'.fid')
+   else
+      svf($name)
+   endif
+else
+   exists($name+'.par','file'):$exists
+   if $exists then
+      write('error',
+        'VNMR parameter file %s already exists - file has not been stored',
+                   $name+'.par')
+   else
+      svp($name)
+   endif
+endif

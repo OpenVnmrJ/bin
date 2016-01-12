@@ -1,0 +1,22 @@
+"       Varian Associates   VNMR   @(#)_solvent	6.2	12/12/91  "
+"***********************************************************"
+" _solvent - updates the solvfactor when solvent is changed "
+"			Author Greg Brissey                 "
+"***********************************************************"
+$snames=userdir+'/solventnames'
+exists($snames,'file'):$esnames
+if not($esnames) then
+  $snames='/vnmr/solventnames'
+  exists($snames,'file'):$esnames
+endif
+if (solvent<>'none')and($esnames) then
+  lookup('file',$snames,solvent,'GName','read',1):$solvent
+  if $solvent<>'' then solvent=$solvent endif
+endif
+exists('solvfactor','parameter'):$e
+if not($e) then
+  create('solvfactor','real') 
+  setgroup('solvfactor','acquisition')
+endif
+solvinfo(solvent): $shift
+solvfactor = ($shift - 5.0) * 1.0e-6

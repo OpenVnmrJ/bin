@@ -1,0 +1,44 @@
+" convertnuc - convert nucleus names to VNMR standard format "
+
+if $#<1 then
+  write('error','usage: convertnuc(name):vnmr_name')
+  return
+endif
+
+$str='' $isot='' $nuc=''
+length($1):$len
+$ix=1 $tlen=100
+repeat
+  substr($1,$ix,1):$str
+  if ($str<'0')or($str>'9') then
+    $tlen=$ix-1
+  endif
+  $ix=$ix+1
+until ($ix>$len)or($tlen<100)
+if $tlen<0.5 then
+  if $len>1 then
+    $subnuc='' $startnuc=''
+    substr($1,1,1):$startnuc
+    shell('echo',$startnuc,' | tr \'a-z\' \'A-Z\'; cat'):$startnuc
+    substr($1,2,$len-1):$subnuc
+    shell('echo',$subnuc,' | sed \'s/-//\' | tr \'A-Z\' \'a-z\'; cat'):$subnuc
+    $nuc=$startnuc+$subnuc
+  else
+    $nuc=$1
+  endif
+  return($nuc)
+else
+  substr($1,1,$tlen):$isot
+  substr($1,$tlen+1,$len-$tlen):$nuc
+  shell('echo',$nuc,' | sed \'s/-//\' | tr \'a-z\' \'A-Z\'; cat'):$nuc
+  length($nuc):$nuclen
+  if $nuclen>1 then
+    $subnuc='' $startnuc=''
+    substr($nuc,1,1):$startnuc
+    substr($nuc,2,$nuclen-1):$subnuc
+    shell('echo',$subnuc,' | tr \'A-Z\' \'a-z\'; cat'):$subnuc
+    $nuc=$startnuc+$subnuc
+  endif
+  $nuc=$nuc+$isot
+  return($nuc)
+endif

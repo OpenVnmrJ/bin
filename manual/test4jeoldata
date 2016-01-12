@@ -1,0 +1,95 @@
+********************************************************************
+*  test4jeoldata -	(regularly) check for VXR/GEMINI data;	   *
+*			if such a data set is found, automatically *
+*			convert and process it.			   *
+*  cleanupjeoldata -	regularly clean up directory for JEOL data *
+*			data (as used by test4jeoldata).	   *
+********************************************************************
+
+
+This is the SUN / VNMR part of a software that automatically captures
+files that are sent over from a JEOL spectrometer (through Ethernet),
+converts them to VNMR format and calls VNMR in background (using exp9)
+with a macro 'jeolproc' for automatically processing (and plotting)
+such remote data. None of the commands involved is normally called 'by
+hand' - the entire process is initiated through the UNIX 'cron' utility.
+
+
+
+test4jeoldata (shell script)
+----------------------------
+
+The UNIX shellscript 'test4jeoldata' should be called every minute, using
+'cron'. Use the UNIX command 'crontab -e' as vnmr1 to add the following
+line to vnmr1's personal 'crontab' file:
+	* * * * *	/vnmr/bin/test4jeoldata
+This calls 'test4jeoldata' every minute, throughout the year.
+
+test4jeoldata checks for files named *.gxp or GXP in a directory
+/home/jeoldata, which must be created first by root using the following
+UNIX commands:
+	su
+	cd /home
+	mkdir jeoldata
+	chown vnmr1.nmr jeoldata
+	chmod 777 jeoldata
+This directory must be writeable by the world, otherwise DecNET (Sun DNI)
+transfers will fail!
+
+'test4jeoldata' will avoid running in multiple copies, such that no conflict
+in using VNMR in the same experiment (exp9) can arise. If the processing
+takes longer than a minute, then the next call is simply skipped.
+
+Within Vnmr the macro 'jeolproc' is called with the file name as argument.
+
+A log file (/home/jeoldata/logfile) is maintained for the entire process,
+including the Vnmr 'background' call. The log file will contain all output
+Vnmr would normally make to either the message or the text window. Blank
+lines and trailing spaces are removed from the log file.
+
+'test4jeoldata' sends very short messages to the console window, e.g.:
+   911202.1203 - test4jeoldata: no new files found in /home/jeoldata
+   911202.1204 - test4jeoldata: processing xyzzy01
+
+In cases where the conversion of (fn).gxd would lead to a duplicate name
+the pre-existing file is simply DELETED.  A message both in the log file
+and in the console window documents such operations, e.g.:
+   911202.1205 - test4jeoldata: removing xyzzy01.fid from /home/jeoldata
+							(duplicate name)
+It is the task of the JEOL (PDP-11 / VAX) software to generate unique file
+names (this can be somewhat alleviated by calling cleanupjeoldata more
+frequently).
+
+Note that 'test4jeoldata' bypasses the experiment locking system for exp9;
+do NOT use exp9 when this software is active!
+
+NOTE: phase-sensitive 2D data (States-Haberkorn method, 2 separate files
+each) would be treated as two files, and the source files would be deleted,
+such that subsequent processing would be impossible. DO NOT use this facility
+to automatically capture phase-sensitive 2D data!
+
+
+
+cleanupjeoldata (shell script)
+------------------------------
+
+The UNIX shellscript 'cleanupjeoldata' should be called periodically (pre-
+ferably through 'cron') to clean up the directory /home/jeoldata for
+remote data from a JEOL spectrometer, to avoid an excessive number of
+unstructured subfiles in this directory. Use the UNIX command 'crontab -e'
+to add this call to vnmr1's 'crontab' file. Proposals:
+	0 6 1 * *	/vnmr/bin/cleanupjeoldata
+for cleaning up once every month (6:00 a.m. on the 1st day of the month), OR
+	0 6 * * 1	/vnmr/bin/cleanupjeoldata
+for cleaning up once every week (6:00 a.m. each Monday), OR
+	0 6 * * *	/vnmr/bin/cleanupjeoldata 
+for cleaning up daily (6:00am). This last option also has the advantage
+that the same filenames can be used every day (which isn't unlikely to
+happen if the standard naming conventions within the sample management
+software are used), and therefore there is less chance for conflicting
+filenames.
+
+'cleanupjeoldata' renames the logfile into logfile.(date) and stores all fid
+files (*.fid) in a new directory data.(date) (where 'date' is a string of
+the form yymmdd.HHMM). This allows for easy archival (and data retrieval)
+in groups. The data are at the same time compressed for disk space economy.

@@ -1,0 +1,28 @@
+"**********************************************"
+" jeolproc - macro to process and plot 1D data "
+"            takes file name as argument       "
+"**********************************************"
+" designed to be called by the 'test4jeoldata' shell script, which	"
+"    periodically converts data delivered from a JEOL data system via	"
+"    Ethernet, and runs this macro through background call to VNMR	"
+"    (using exp9); JEOL file conversion is achieved in done within	"
+"    this macro as well							"
+" R.Kyburz, 93-2-18 "
+
+if $#<0.5 then
+  return
+endif
+jeoltovar($1)
+exists(curexp+'/acqfil/fid','file'):$exists
+if $exists then
+  if tn='H1' then
+    rfl=1p rfp=0
+    pltmod='user' h1p
+    exists($1+'.fid','file'):$exists2
+    if $exists2 then
+      flush shell('cp -f',curexp+'/curpar',$1+'.fid/procpar')
+    endif
+  endif
+else
+  echo('jeolproc: no fid present - skipping processing')
+endif

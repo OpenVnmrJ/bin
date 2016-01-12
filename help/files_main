@@ -1,0 +1,56 @@
+
+	files utility   --   Main menu
+
+  Buttons
+
+  1:Set Directory   -  If you have selected a single entry which is
+                       a directory, it becomes the new current
+                       directory.  If no entries are selected, a new
+                       menu appears, giving you choices for selecting
+                       a new current directory.  Otherwise, an error
+                       is reported and any selections are deselected.
+                       Directories have a '/' in front of their
+                       names.
+
+  2:File Info       -  Presents a new menu which allows you to
+                       obtain a list of the files in your current
+                       directory, sorted by size or date of
+                       modification.
+
+  3:Tape            -  Presents a new menu which lets you read and
+                       write streaming tapes.
+
+  4:Load            -  If you have selected an entry which has Varian
+                       NMR data, including data from a Gemini, VXR or
+                       XL system, that data set is loaded into the
+		       current experiment. The data can also be tar
+		       files (*.tar) or compressed tar files (*.tar.Z).
+		       JEOL data (not phase-sensitive 2D) will be converted
+		       automatically.
+
+  5:Data            -  Presents a new menu with choices for
+                       accessing NMR data and releated files.
+
+  6:Delete          -  Deletes each entry which you have selected,
+                       including subdirectories and their contents.
+
+  7:More            -  Presents a new menu with additional options
+
+  8:Return          -  Leave the files program.
+
+
+  Buttons 2, 3, 5 and 7 each display a new menu.  Button 1 will show a
+  new menu if you have not selected any entries.
+ 
+
+  The displayed file names can be selected by clicking the left mouse
+  button on the file name.  The filename will be in reverse video when
+  selected.  To deselect a file name, click on it again.
+
+
+  Mouse
+
+  Left Button - marks files
+
+  Notes - To mark a file, place mouse cursor over the filename and
+	  click the left mouse button.

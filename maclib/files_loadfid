@@ -1,0 +1,44 @@
+"       Varian Associates   VNMR   @(#)files_loadfid 1.3 5/26/92  "
+
+$num=0
+filesinfo('number'):$num
+if ($num = 1) then
+    $f=''
+    filesinfo('name'):$f
+    $name=''
+    $ext=''
+    getext($f):$name,$ext
+    if ($ext = 'Z') then
+	echo('   uncompressing file ...')
+	shell('uncompress',$name):$ret
+	$f=$name
+	getext($f):$name,$ext
+    endif
+    if ($ext = 'tar') then
+	echo('   extracting tar file ...')
+	shell('tar xvf',$f+'; rm',$f)
+	$f=$name
+	getext($f):$name,$ext
+    endif
+    if ($ext = 'par' or $ext = 'fid') then
+        rt($name)
+    else
+        if ($ext = 'gxp' or $ext = 'GXP' or $ext = 'gxd' or $ext = 'GXD') then
+            jeoltovar($name)
+        else
+            $l=0
+            length($ext):$l
+            if ($l = 1 and $ext >= '1' and $ext <= '9') then
+                convert($name)
+            else
+                write('error','Selected file does not contain NMR data')
+                filesinfo('redisplay')
+            endif
+        endif
+    endif
+else
+    write('error','Select an entry which contains NMR data')
+    if ($num > 0) then
+        filesinfo('redisplay')
+    endif
+endif

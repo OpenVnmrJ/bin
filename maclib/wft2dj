@@ -1,0 +1,51 @@
+"**************************************************************************"
+" wft2dj :  Full phase-sensitive transform allowing baseline correction    "
+"           after the F2 transform FOR JEOL DATA                           "
+"**************************************************************************"
+
+"arg1 - 'bc' invokes a baseline correction after the F2-FT"
+"arg2 - order of polynomial used for baseline correction"
+
+if ($# > 2) then
+   write('line3','Too many arguments!')
+   return
+endif
+if ($# > 0) then
+   if ($1 <> 'bc') then
+      write('line3','First argument must be old!')
+      return
+   endif
+endif
+
+trace='f1'
+exists('phase','parameter'):$e
+if ($e>0.5) then
+  $nphase = size('phase')
+  if ($nphase = 1) then
+    if (phase = 0) then
+      wft2d(1,0,0,1)
+      return
+    endif
+  endif
+else  "phase parameter does not exist"
+  wft2d(1,0,0,1)
+  return
+endif
+
+if ($# > 0) then
+  if ($nphase = 1) then
+    wft1d(1,0,0,1)
+  else
+    wft1d(1,0,0,0,0,0,1,0)
+  endif
+     
+  if (($# = 1) and ($1 = 'bc')) then bc('f2',1) endif
+  if (($# = 2) and ($1 = 'bc')) then bc('f2',$2) endif
+endif
+
+trace='f2'
+if ($nphase = 1) then
+  wft2d(1,0,0,1)
+else
+  wft2d(1,0,0,0,0,0,1,0)
+endif

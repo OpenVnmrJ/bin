@@ -1,0 +1,48 @@
+#!/bin/sh
+#   cleanupjeoldata - clean up the directory for JEOL remote data and
+#		      create a backup of the current log file
+#
+#  add to vnmr1's crontab file as follows:
+#	0 6 1 * *	/vnmr/bin/cleanupjeoldata
+#  to clean up the data directory once every month (6:00 a.m. on the first
+#  of the month), OR
+#	0 6 * * 1	/vnmr/bin/cleanupjeoldata
+#  to clean up the data directory once every week (6:00 a.m. each Monday), OR
+#	0 6 * * *	/vnmr/bin/cleanupjeoldata
+#  to clean up the data directory daily (6:00 a.m.)
+#  Use 'crontab -e' to add the line to your personal crontab file.
+#
+#  Rolf Kyburz, 1991-09-15
+
+date=`date +%y%m%d.%H:%M`
+cd /home/jeoldata
+if [ -f logfile ]
+then
+  mv logfile logfile.$date
+fi
+if [ `ls *.fid 2> /dev/null | wc -l` -gt 0 ]
+then
+  mkdir data.$date
+  for f in *.fid
+  do
+    tar cf $f.tar $f
+    compress $f.tar
+    rm -rf $f
+    mv -f $f.tar.Z data.$date
+  done
+fi
+if [ `ls *.par 2> /dev/null | wc -l` -gt 0 ]
+then
+  mkdir data.$date
+  for f in *.par
+  do
+    tar cf $f.tar $f
+    compress $f.tar
+    rm -rf $f 
+    mv -f $f.tar.Z data.$date
+  done
+fi
+find . -name \*.gx\? -mtime +1 -exec rm -f {} \; \
+	-o -name data.\* -prune -o -name \*.fid -prune
+find . -name \*.GX\? -mtime +1 -exec rm -f {} \; \
+	-o -name data.\* -prune -o -name \*.fid -prune

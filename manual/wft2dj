@@ -1,0 +1,19 @@
+
+******************************************************************************
+wft2dj(<arg1> , <arg2>) - Weight and transform JEOL 2D data (macro)
+******************************************************************************
+
+The complete phase-sensitive FT may be performed with a single command.
+WFT2DJ functions for hypercomplex 2D FID data (PHASE = 1,2) as well as
+absolute value date acquired on GX, GSX and EX spectrometers.
+
+<arg1> :  if set to 'bc', performs a baseline correction on the F2 spectra
+          prior to the FT along F1; if 'bc' is selected, the "baseline"
+          regions must have been determined prior to the execution of this
+          macro;
+
+<arg2> :  if arg1 = 'bc', then arg2 specifies the order of polynomial used
+          in the baseline correction.
+
+For PHASE = 0	    wft2dj  =  wft2d = wft2d(1,0,0,1)
+For PHASE = 1,2:    wft2dj  =  wft2d(1,0,0,0,0,0,1,0)

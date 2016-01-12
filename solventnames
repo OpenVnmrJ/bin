@@ -1,0 +1,37 @@
+*****************************************************************************
+solventnames - 	table for the translation of solvent names to a single
+		generalized name per solvent
+*****************************************************************************
+DeuteriumOxide	D2O	ED2O
+GName	D2O
+*****************************************************************************
+Acetone Acetone-d6	CD3COCD3	(CD3)2CO	ACETN	EACTN	ACTON
+GName	Acetone
+*****************************************************************************
+Benzene	Benzene-d6	C6D6	EC6D6
+GName	Benzene
+*****************************************************************************
+DMSO	DMSO-d6	CD3SOCD3	EDMSO
+GName	DMSO
+*****************************************************************************
+MethyleneChloride	MethyleneChloride-d2	CD2Cl2	CD2CL
+GName	CD2Cl2
+*****************************************************************************
+Chloroform	Chloroform-d	CDCl3	ECDL3
+GName	CDCl3
+*****************************************************************************
+Cyclohexane	Cyclohexane-d12	C6D12
+GName	Cyclohexane
+*****************************************************************************
+Toluene	Toluene-d8	C6D5CD3
+GName	Toluene
+*****************************************************************************
+CD3COOD	Acetic_Acid	Acetic_Acid-d4
+GName	CD3COOD
+*****************************************************************************
+CD3OD	Methyl_Alcohol	Methyl_Alcohol-d4	Methanol Methanol-d4	ECD3D
+GName	CD3OD
+*****************************************************************************
+Acetonitrile	Acetonitrile-d3	CD3CN
+GName	CD3CN
+*****************************************************************************

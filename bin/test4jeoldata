@@ -1,0 +1,106 @@
+#!/bin/sh
+#  test4jeoldata - shell script to periodically check a directory
+#		   /home/jeoldata for fids that were sent over from a
+#		   JEOL GX/GSX/EX spectrometer. If such data are found
+#		   they are converted to VNMR format and processed by VNMR
+#
+#  Rolf Kyburz, 1993-02-18
+
+majorrev=`uname -r | awk 'BEGIN {FS="."} {print $1}'`
+if [ $majorrev -ge 5 ]; then
+  sysV=y
+  ps="/bin/ps -ef"
+else
+  sysV=n
+  ps="/usr/kvm/ps -ax"
+fi
+
+# +----------------------------------------+
+# | allow for only 1 copy to run at a time |
+# +----------------------------------------+
+$ps > /tmp/ps.$$
+if [ `grep test4jeoldata /tmp/ps.$$ | wc -l` -gt 2 ]
+then
+  rm /tmp/ps.$$
+  exit 1
+fi
+rm /tmp/ps.$$
+
+# +-----------------------------------------------------------------+
+# | THE FOLLOWING VARIABLES CAN BE ADJUSTED FOR SPECIFIC SITUATIONS |
+# +-----------------------------------------------------------------+
+macro=jeolproc			# name of calling macro: 'jeolproc'
+exp=9				# processing is done in exp9
+jeoldir=/home/jeoldata		# directory into which data are sent by ethernet
+log=/home/jeoldata/logfile	# log file (blank lines are removed)
+date=`date +%y%m%d.%H:%M`
+cmd=`basename $0`
+console=/dev/console
+
+# +------------------------------------------------------------------------+
+# | this script is called through 'cron' and does not go through '.login'; |
+# | the common environment variables therefore must be defined here.       |
+# +------------------------------------------------------------------------+
+home=/home/vnmr1
+HOME=/home/vnmr1
+vnmruser=$home/vnmrsys
+vnmrsystem=/vnmr
+memsize=8
+export vnmruser vnmrsystem memsize home HOME
+
+
+# +-----------------------------------------------------------------+ 
+# | next check on *.5 files (which includes renamed *.36 files now) |
+# |   convert them and call Vnmr in background for each of them     |
+# +-----------------------------------------------------------------+
+cd $jeoldir
+if [ `ls *.gxp 2> /dev/null | wc -l` -gt 0 ]
+then
+  echo "############  $date  ############" >> $log.$$
+  wait=y
+  for f in *.gxp
+  do
+    if [ $wait = y ]
+    then
+      sleep 10  # on the first file wait 10 seconds to allow transfer
+      wait=n    # Ethernet (DecNET) to complete
+    fi
+    echo "$date - $cmd: processing $f" > $console
+    echo "****************************************" >> $log.$$
+    echo "* AUTOMATIC REMOTE NMR DATA PROCESSING *" >> $log.$$
+    echo "****************************************" >> $log.$$
+    base=`basename $f .gxp`
+    if [ -d $base.fid ]
+    then
+      echo "$cmd: removing $base.fid from $jeoldir (duplicate name)" >> $log.$$
+      echo "$cmd: removing $base.fid from $jeoldir (duplicate name)" > $console
+      rm -rf $base.fid
+    fi
+    echo "===> Processing $base <===" >> $log.$$
+
+    # the following line is dangerous, in that it disables the experiment
+    # locking feature - but it avoids blocking of the automatic processing
+    # by inadvertent Vnmr crashes through macro problems.
+    rm -f /home/vnmr1/vnmrsys/lock_9.primary
+
+    # calling Vnmr in background; assuming the processing macro takes
+    # the file name of the file which is to be processed as single argument.
+    cd /vnmr/bin
+    /bin/csh -c "Vnmr -mback -n"$exp" "$macro"\(\'"$jeoldir"/"$base"\'\)" >> $log.$$ 2>&1
+    cd $jeoldir
+    rm -f $base.gx? $base.GX?
+  done
+else
+  # route the following output to /dev/null to avoid one message every minute
+  echo "$date - $cmd: no new files found in $jeoldir" > $console
+fi
+
+# compress and add temporary log to main log
+#    (remove trailing blanks from text files)
+if [ -f $log.$$ ]
+then
+  cat $log.$$ | tr '\031' ' ' | expand | sed 's/  using parameter file/\
+using parameter file/
+s/[ ]*$//' | unexpand -a | awk '{if (NF>0) print}' >> $log
+  rm $log.$$
+fi

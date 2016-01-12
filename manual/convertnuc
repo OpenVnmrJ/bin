@@ -1,0 +1,16 @@
+
+******************************************************************************
+convertnuc - convert nucleus names into VNMR standard format	(macro)
+******************************************************************************
+
+  Syntax:	convertnuc('nucname'):standard_nucname
+
+  Description:	convertnuc translates arbitrary nucleus names like 13C, C-13,
+		13-C, SN119, 119SN, SN-119, 119-SN into Vnmr standard format
+		(as defined in the VNMR nucleus tables): C13, Sn119
+		convertnuc is useful in connection with conversion software
+		like 'jeoltovar', since other manufacturers have different
+		conventions for naming chemical isotopes.
+
+  Example:	n1='119-SN' convertnuc(n1):tn
+		convertnuc('1H'):dn
