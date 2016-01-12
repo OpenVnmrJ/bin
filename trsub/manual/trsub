@@ -1,0 +1,77 @@
+*******************************************************************************
+  trsub - subtract reference trace from all other traces  (macro / C program)
+*******************************************************************************
+
+A) Application to Arrayed 1D Spectra:
+-------------------------------------
+This utility was written to facilitate 1D NOE difference experiments. Up to
+now there were always two choices:
+  a) to use a simple irradiation array (possibly with frequency cycling over
+     multiplets) including an off-resonance control experiment, followed by
+     repetitive uses of spadd/spsub (or addi), or
+  b) to use a sequence that directly subtracts reference scans from irradiation
+     scans.
+The latter approach does not require special processing, but it imposes a 1:1
+ratio of irradiation experiments and control scans and hence is not very effi-
+cient during the acquisition. The formar approach only requires a single off-
+resonance trace for an arbitrary number of on-resonance traces, but required
+tedious (manual) processing (although macros could be used to facilitate the
+construction of the differences).
+trsub now calculates all the differences (for method a) in a single operation.
+
+B) Application to 2D Spectra:
+-----------------------------
+For the removal of ridges in 2D spectra a method has been proposed to subtract
+a "pure noise" trace from the entire spectrum. trsub can be used to subtract
+a HORIZONTAL trace (f1 or f2 mode) from the entire spectrum.
+
+
+MACRO:
+------
+
+Syntax:         trsub<(reftrace)>
+
+Description:    In the case of 1D SPECTRA trsub expects a transformed spectrum
+		in curexp/datdir/data.
+		reftrace is the array index of the (off-resonance) reference
+		trace. Default: the last trace, i.e., reftrace=arraydim).
+		The reference trace will not be modified by this utility.
+
+		In the case of 2D SPECTRA, trsub uses curexp/datdir/phasefile.
+		The default reference trace is the first trace, and that will
+		also be subtracted from itself, hereby leading to a zero trace.
+		Note that the 2D spectrum must have been fully displayed before
+		calling this macro, otherwise the phasefile will not be updated
+		properly. Note also that trsub does not seem to work with
+		pmode='full'; select pmode='partial' for phase-sensitive 2D
+		spectra.
+
+Examples:       trsub
+			subtracts the last trace from all the other traces (1D)
+			subtracts the first trace from all the other traces (2D)
+                trsub(3)
+			subtracts trace 3 from all the other traces
+
+
+C Program:
+----------
+
+Syntax:         trsub datafile <reftrace <f1|f2>>
+
+Description:    the trsub program "does all the work" of the trsub macro;
+		it also requires the data file (typically curexp/datdir/data)
+		to be specified. Different from the macro, the default refe-
+		rence trace number is 1. In theory, the program should also
+		work on phasefile, but this is not recommended, as that file
+		in general is too volatile in the case of 1D spectra.
+		It is conceivable that trsub could be used to subtract a
+		reference trace from a 2D spectrum. In this case the
+		phasefile should be used, NOT data (which could be organized
+		in submatrixes); note that this will ONLY work for f1 traces,
+		NOT in f2 mode). 
+		For 2D spectra the third argument should be f1 or f2.
+
+Examples:	trsub ~/vnmrsys/exp1/datdir/data
+		trsub ~/vnmrsys/exp1/datdir/data 3
+		trsub ~/vnmrsys/exp1/datdir/phasefile
+		trsub ~/vnmrsys/exp1/datdir/phasefile 7

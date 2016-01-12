@@ -1,0 +1,56 @@
+" ******************* "
+" *** macro trsub *** "
+" ******************* "
+
+" Usage:	trsub<(reftrace)>					"
+
+" Description: 	in an arrayed 1D NOE experiment (without 'internal'	"
+"		subtraction) takes the (transformed) reference spectrum	"
+"		in curexp/datdir/data and subtracts it from all the	"
+"		other traces						"
+"		reftrace is the array index of the (off-resonance)	"
+"		reference trace; defaults to the last trace		"
+"		In the case of 2D spectra, trsub works on phased data	"
+"		(curexp/datdir/phasefile), and the default reference	"
+"		trace number is 1. In f1 mode, trsub subtracts an f1	"
+"		trace from all the others; in f2 mode, trsub subtracts	"
+"		the specified f2 trace from all the others.		"
+"		In 2D spectra, only HORIZONTAL traces can be subtracted "
+
+" R.Kyburz - 93/08/23 "
+
+
+" find out whether we are looking at 2D data "
+$2d=0 $reftrace=arraydim
+exists('sw1','parameter'):$esw1
+exists('ni','parameter'):$eni
+if (($eni=1)and($esw1=1)) then
+  if ni>1 then
+    $2d=1
+    $reftrace=1
+  endif
+endif
+
+" check argument "
+if $#>0 then $reftrace=$1 endif
+$ref='' format($reftrace,1,0):$ref
+
+" flush memory to disk "
+flush
+
+" subtract the reference trace "
+$res=''
+if $2d=0 then		" 1D spectra "
+  shell('trsub',curexp+'/datdir/data',$ref,'2>&1'):$res
+  " disable datdir/phasefile, to force a redisplay "
+  shell('cat /dev/null >',curexp+'/datdir/phasefile'):$res
+else			" 2D spectra "
+  if trace='f1' then
+    shell('trsub',curexp+'/datdir/phasefile',$ref,'f1 2>&1'):$res
+  else
+    shell('trsub',curexp+'/datdir/phasefile',$ref,'f2 2>&1'):$res
+  endif
+endif
+
+" if the external program created output, display that as error message "
+if $res<>'' then write('error',$res) endif
