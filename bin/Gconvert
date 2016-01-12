@@ -1,0 +1,100 @@
+#!/bin/sh
+# Gconvert - recursively decompose VXR directories and convert VXR fids
+#
+# Rolf Kyburz,	1/1/92
+
+curdir=`pwd`
+
+if [ $# -gt 0 ]
+then
+  files=''
+  for f in $*
+  do
+    if [ -d $f ]
+    then
+      cd $f
+      Gconvert
+      cd $curdir
+    else
+      base=`basename $f`
+      body=`echo $base | tr '.' ' ' | awk '{print $1}'`
+      suffix=`echo $base | tr '.' ' ' | awk '{print $2}'`
+      if [ x$suffix != x -a x$body != x$base ]
+      then
+        suffixc1=`echo $suffix | awk '{print substr($0,1,1)}'`
+        if [ $suffixc1 -ge 1 -a $suffixc1 -le 9 ]
+        then
+          if [ "x$files" = x ]
+          then
+            files=$f
+          else
+            files="$files $f"
+          fi
+        fi
+      fi
+    fi
+  done
+  if [ "x$files" = x ]
+  then
+    exit
+  fi
+else
+  if [ `ls | wc -l` -eq 0 ]
+  then
+    exit
+  fi
+  for f in *
+  do
+    if [ -d $f ]
+    then
+      cd $f 
+      Gconvert 
+      cd $curdir
+    fi
+  done
+  if [ `ls *.[1-9]* 2> /dev/null | wc -l` -eq 0 ]
+  then
+    exit
+  else
+    files=`ls *.[1-9]*`
+  fi
+fi
+
+date=`date +%y%m%d.%H:%M`
+for f in $files
+do
+  base=`basename $f`
+  if [ "$base" != "$f" ]
+  then
+    tlen=`echo $f | awk '{print length}'`
+    blen=`echo $base | awk '{print length}'`
+    dlen=`expr $tlen - $blen`
+    dlen=`expr $dlen - 1`
+    dirname=`echo $f | awk '{print substr($0,1,'$dlen')}'`
+    cd $dirname
+  fi
+  body=`echo $base | tr '.' ' ' | awk '{print $1}'`
+  suffix=`echo $base | tr '.' ' ' | awk '{print $2}'`
+  if [ x$suffix = x5 -a ! -d $base ]
+  then
+    cpos_cvt $base $body.fid
+    if [ -d $body.fid ]
+    then
+      rm $base
+    fi
+  elif [ $suffix -gt 0 -a $suffix -le 721 -a ! -d $base ]
+  then
+    if [ -f $body -o -d $body ]
+    then
+      mv $body $body.bkup.$date
+    fi
+    decomp $base
+    if [ -d $body ]
+    then
+      rm $base
+      cd $body
+      Gconvert
+    fi
+  fi
+  cd $curdir
+done

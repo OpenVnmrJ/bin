@@ -1,0 +1,51 @@
+#!/bin/sh
+#**************************************************************************
+#   readvxrtape - shell script for reading entire VXR-4000 tapes quickly  *
+#                 2-2-91  r.kyburz                                        *
+#   usage: assumes the tape has been created with STAPE(WRITE,DSKn,...)   *
+#          if a directory with a different number of entries was stored   *
+#          on the tape, the decomposition of the resulting file will fail.*
+#          In such a case try renaming the file to tape.n, where n is     *
+#          a different multiple of 36. The maximum directory size on      *
+#          the VXR-4000 is 432 entries.                                   *
+#          'readvxrtape' works very quickly, but does NOT allow to        *
+#          selectively extract single subfiles, or to read a tape catalog *
+#**************************************************************************
+majorrev=`uname -r | awk 'BEGIN {FS="."} {print $1}'`
+if [ $majorrev -ge 5 ]; then
+  if [ x$TAPE != x ]; then
+    stdtape=$TAPE
+    lastchar=`echo $stdtape | awk '{print substr($0,length,1)}'`
+    if [ x$lastchar != xn ]; then
+      stdtape=${stdtape}n
+    fi
+    tape=$stdtape
+  else
+    tape=/dev/rmt/0lbn
+  fi
+else
+  if [ x$TAPE != x ]; then
+    tape=`basename $TAPE`
+    firstchar=`echo $tape | awk '{print substr($0,1,1)}'`
+    if [ $firstchar != n ]; then
+      tape=n$tape
+    fi
+    tape=/dev/$tape
+  else
+    tape=/dev/nrst0
+  fi
+fi
+date=`date +%y%m%d.%H:%M`
+if [ -f tape.288 ]
+then
+  mv tape.288 tape.$date.288
+fi
+echo "rewinding tape ..."
+mt -f $tape rew
+echo "skipping tape header ..."
+mt -f $tape fsf 1
+echo "reading tape ..."
+dd if=$tape of=tape.288 ibs=512000
+echo "rewinding tape ..."
+mt -f $tape rew
+echo " ... done."

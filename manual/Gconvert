@@ -1,0 +1,31 @@
+***********************************************************
+*  Gconvert	-	global conversion / decomposition *
+***********************************************************
+
+
+SHELLSCRIPT
+-----------
+
+The UNIX shellscript Gconvert can be run from within UNIX using the
+following format:
+
+                Gconvert <vxrfiles>
+                Gconvert <directories>
+
+
+Gconvert without argument looks at all files with numeric suffix in the
+current directory; alternatively such files can be specified as argument(s).
+If the files found (or specified) are VXR fids (e.g. COSY.5), they are
+converted to VNMR format (cpos_cvt); if they are VXR-directories (e.g.
+DSK2.288), then they are decomposed (decomp), and Gconvert is called on
+all the files contained in the decomposed directory. Whenever the decompo-
+sition, resp. the conversion, was successful, the "source" file is deleted.
+Alternatively, directorynames can be given as arguments - Gconvert will
+the recursively descend into those directories and convert any VXR fid
+it finds therein.
+
+Data files (e.g. SAMPLE.DAT) and VXR programs (e.g. from COMLIB) are NOT
+touched; similarly, VNMR files are left untouched.
+
+If a conversion or decomposition would result in a filename that already
+exists, the current VNMR file is renamed to <filename>.bkup.<date>.

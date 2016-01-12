@@ -1,0 +1,30 @@
+
+*******************************************************************************
+  readvxrtape - read VXR-4000/GEMINI tape		(Shell Script)
+*******************************************************************************
+
+READVXRTAPE is a UNIX command installed as part of the VNMR system to allow
+to read VXR-4000/GEMINI tapes very quickly (1 - 3 minutes), but not specifi-
+cally.
+
+Syntax:		readvxrtape
+
+Description:	readvxrtape assumes the tape has been created with
+		STAPE(WRITE,DSKn,...). readvxrtape will generate a file
+		tape.288, which then can be decomposed with the "decomp"
+		command. If such a file already exists, it is renamed to
+		'tape.yymmdd.HH:MM.288' (where "yymmdd.HH:MM" is the date
+		and the current time).
+
+		If a directory with a different number of entries was stored
+		on the tape, the decomposition of the resulting file will
+		fail. In such a case try renaming the file to tape.n, where
+		n is a different multiple of 36. The numeric extension of
+		the UNIX file name corresponds to the maximum number of
+		entries in the VXR/GEMINI directory (the "I2 part of the
+		FCB"). The maximum directory size on the VXR-4000 is 432
+		entries (12 x 36).
+
+		'readvxrtape' works very quickly, but does NOT allow to
+		selectively extract single subfiles, nor to read a tape
+		catalog. Use 'tape -q' for that purpose.
