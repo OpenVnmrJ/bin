@@ -1,0 +1,12 @@
+*********************** VARIAN NMR USER GROUP LIBRARY ***********************
+                              NEW MANUAL ENTRY
+
+rtmsl	 	One-step conversion of Bruker MSL data sets
+
+Syntax:		rtmsl('filename')
+
+Description:	Converts and retrieves a Bruker MSL data set in one step,
+		rather than requiring the use of the fixmsl, convertbru,
+		sread, and rm commands.
+
+Examples:	rtmsl('mybrukerdata')

@@ -1,0 +1,8 @@
+"rtmsl - MAGICAL macro to reformat and retrieve a Bruker data set"
+"usage: rtmsl('filename')"
+
+shell('fixmsl ',$1)
+convertbru($1+'.short')
+sread($1+'.short.cv')
+rm($1+'.short')
+rm('-r',$1+'.short.cv')

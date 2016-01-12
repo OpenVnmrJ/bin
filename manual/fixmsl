@@ -1,0 +1,15 @@
+*********************** VARIAN NMR USER GROUP LIBRARY ***********************
+                              NEW MANUAL ENTRY
+
+fixmsl		Pre-processor for Bruker MSL data sets
+
+Syntax:		fixmsl inputfile <outputfile>
+
+Description:	"Fixes" data from Bruker MSL spectrometers by removing the
+		last 1024 bytes of the file so that it can be processed
+		properly by convertbru
+
+Examples:	fixmsl mybrukerdata.001
+		fixmsl yourmsl.001 goodmsl
+
+See also:	Macro rtmsl
