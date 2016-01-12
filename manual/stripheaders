@@ -1,0 +1,46 @@
+*********************** VARIAN NMR USER GROUP LIBRARY ***********************
+                              NEW MANUAL ENTRY
+
+ stripheaders - Strip headers from binary VNMR data files (UNIX)
+
+   Syntax:   	stripheaders VNMR_binary_datafile
+
+   Description:	"stripheaders" is meant to help exporting VNMR data for
+		third party software that expects data files without
+		file and block headers.
+
+		"stripheaders" creates the following output files from a
+		binary VNMR data file:
+		 - <filename>.bin: the binary VNMR file without the file
+		  		   and block headers
+		 - <filename>.hdr: the collected headers from the binary
+				   VNMR file, WITHOUT the data segments
+		 - <filename>.txt: text file describing the contents of
+				   the file (header)
+		The original file is NOT altered by "stripheaders"!
+		All data are collected in *.bin, the headers are collected
+		in *.hdr, and *.txt contains readable information that should
+		allow the user to determine what the new files contain (note
+		that without *.hdr and *.txt the structure of *.bin is not
+		known!
+
+		For 2D data (processed in 2D mode, NOT with 'wft', the
+		output files from processing expn/datdir/phasefile are
+		named f1traces.bin, f1traces.hdr, f2traces.bin, f2traces.hdr
+		and phasefile.txt. Either the F1 files or the F2 files can
+		be missing, depending on whether in VNMR a dcon/dconi was
+		done with trace='f1' or trace='f2', or both.
+		Known limitation / restriction: For 2D data (processed in
+		2D mode, NOT with 'wft', the file datdir/data (complex 2D
+		data) CANNOT be processed with "stripheaders".
+		"phasefile" and "data" are recognized by name - you should
+		NOT rename these files before calling "stripheaders" on them!
+
+		Make sure you type
+			flush
+		in VNMR before processing data in the current experiment!
+
+   Examples:	stripheaders ~/vnmrsys/exp3/acqfil/fid
+                stripheaders ~/vnmrsys/exp3/datdir/data
+                stripheaders ~/vnmrsys/exp3/datdir/phasefile
+		stripheaders myfid.fid/fid

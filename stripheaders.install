@@ -1,0 +1,21 @@
+#!/bin/sh
+majorrev=`uname -r | awk 'BEGIN {FS="."} {print $1}'`
+dir=`pwd`
+cd /vnmr
+vdir=`pwd`
+if [ -f $dir/source/getcelem.c ]; then
+  cd $dir/source
+  if [ $dir = $vdir ]; then
+    bintarget=$dir/bin
+  else
+    bintarget=$HOME/bin
+    if [ ! -d $bintarget ]; then
+      mkdir $bintarget
+    fi
+  fi
+  if [ $majorrev -lt 5 -o ! -x $bintarget/getcelem ]; then
+    echo "Compiling stripheaders.c ... "
+    cc -O -o $bintarget/stripheaders stripheaders.c
+  fi
+fi
+
