@@ -1,0 +1,605 @@
+
+*******************************************************************************
+ makecd - Write ISO9660 Archive File / Archive Data on CD-R  (M)
+*******************************************************************************
+
+ Syntax:      makecd
+
+ Description: "makecd" is a VnmrJ / VNMR macro that opens a UNIX shell window
+              in which the shell script "makecd" is run using the default
+              settings as defined in "/vnmr/app-defaults/makecd" or (if
+              defined) in the user's local "~/app-defaults/makecd". You may,
+              however, specify additional arguments to the macro call, as
+              described for the "makecd" shell utility, see below.
+              As the archival process may take several minutes, the shell
+              window is opened in background mode, such that VnmrJ / VNMR
+              remains usable during the archival process. However, note that
+              it is advisable NOT to alter data in the archival source
+              directory while the archival is in progress!
+
+ Arguments:   As defined for the UNIX / shell utility "makecd", see below.
+
+ Examples:    makecd
+              makecd('-source',userdir+'/mydata','mydata.iso')
+              makecd('-source',userdir+'/mydata','-old','$HOME/archives')
+
+ Related:     imakecd - Interactively Write Data to ISO9660 Archive / CD-R (M)
+              makecd - Write ISO9660 Archive File / Archive Data on CD-R (U)
+
+
+*******************************************************************************
+ makecd - Write ISO9660 Archive File / Archive Data on CD-R (U)
+*******************************************************************************
+
+ Syntax:      makecd <-age ###|-date<limit> yyyy-mm-dd> <-confirm> \
+                     <-debug <level>> <+followlinks|-followlinks> \
+                     <-interactive> <-log log_file> <-number #> \
+                     <-old|-up|-recent|-down> <-size #_MBytes> \
+                     <-sourcedir source_dir> <-skip> <-speed #> <-test> \
+                     <-volname volume_name> <target>
+              makecd <-age ###|-date<limit> yyyy-mm-dd> <-debug <level>> \
+                     <+followlinks|-followlinks> <-log log_file> \
+                     <-number #> <-old|-up|-recent|-down> <-print|-query> \
+                     <-size #_MBytes> <-sourcedir source_dir> <-skip> \
+                     <-test> <-speed #> <-volname volume_name> <target>
+              makecd -version
+              makecd -help
+              makecd -manual
+
+ Description: "makecd" is a UNIX command that is used to create an ISO9660
+              disk image for archival purposes (e.g., to transfer to a PC, Mac
+              or other Sun with a CD-R/RW drive, or for local writing to CD-R
+              media, in case multiple backup copies need to be created), or
+              to archive data on CD-R media directly (provided there is such a
+              drive).
+              "makecd" assumes a media size of 650 MBytes (see the "-size"
+              argument description below). If the amount of data in
+              the archival (source) directory exceeds the capacity of the
+              media, "makecd" only archives the most recent data (or the
+              oldest data, depending on the mode chosen, see "-recent"
+              and "-old" argument descriptions below), up to the
+              capacity of the media.
+              For a list of (optional) arguments see below. "makecd" permits
+              specifying
+                - the media size ("-size" argument, see below)
+                - the media speed ("-speed" argument, see below)
+                - the source directory with the data to be archived
+                  ("-sourcedir" argument, see below)
+                - absolute or relative date/age limits for the archive subfile
+                  selection
+                - the log file or directory path ("-log" argument, see below)
+                - the path to the ISO9660 image ("target" argument, see below)
+                - whether or not to follow symbolic links in the ISO9660
+                  archive ("+followlinks" / "-followlinks" arguments, see
+                  below)
+                - whether the most recent or the oldest data are archived in
+                  case the media capacity is insufficient for all data in the
+                  archival (source) directory ("-old" and "-recent" arguments,
+                  see below), or, in the case of multi-volume archiving, if
+                  the archiving should start with the most recent ("-down") or
+                  with the oldest data ("-up" option).
+                - the amount of output that "makecd" generates ("-debug"
+                  option, see below).
+              For all arguments, "makecd" has built-in defaults (see the
+              argument descriptions below) - it is possible to call "makecd"
+              without any argument. The built-in defaults can be modified via
+              optional configuration file "/vnmr/app-defaults/makecd" or
+              "~/app-defaults/makecd". If both files exist, both are parsed
+              for active lines, but (for each active definition) a local entry
+              overrides a global one. If "makecd" was installed in "/vnmr" and
+              a local version of the configuration file should be created, use
+                      cp /vnmr/app-defaults/makecd ~/app-defaults/makecd
+              This configuration file is a simple text file with comments that
+              should be self-explanatory, at least combined with this manual
+              file.
+
+              Limitations:
+                - "makecd" works best with the version of "mkisofs" delivered
+                  with Solaris 9 & up; with earlier versions, partial
+                  archiving from directories that exceed the capacity of the
+                  archival media has limitations, i.e., "makecd" may abort if
+                  the amount of data in the archive directory exceeds the
+                  media capacity so much that a large number of files need to
+                  be excluded. Also, "makecd" uses "cdrw" (included with
+                  Solaris 9 & up, not available with Solaris 8) to write data
+                  to CD-R/RW media; if "cdrw" is not found, "makecd" looks for
+                  "cdrecord" (available as shareware utilities from the
+                  Solaris 8 Companion CD, standard with RedHat Linux). If
+                  neither "cdrw" nor "cdrecord" are available, you can still
+                  use "makecd" to archive data into an ISO9660 disk image on
+                  the harddisk (provided "mkisofs" is present); this disk
+                  image can then be transferred to a PC, a Mac or a Sun
+                  workstation with a CD-R burner.
+                - Only one source (archive) directory can be specified; use
+                  symbolic links and the "+followlinks" option if you want to
+                  include data from other directories.
+                - The target paths "cdrom", "cdrom0", "cdrom1", "c#t#d#s#,
+                  "c#t#d#" etc. are reserved names that are recognized by the
+                  volume management and indicate to "makecd" that you want to
+                  write a CD-R disk directly - you cannot use these names for
+                  writing ISO9660 disk images on the harddisk!
+                - Multi-session CD-R disks are NOT supported - you MUST use
+                  blank media!
+                - Despite the use of the Joliet and Rockridge extensions and
+                  several other options (violating the ISO9660 standard,
+                  strictly speaking), UNIX still offer vastly more freedom in
+                  naming files - hence, filenames that are longer than 32
+                  characters will be truncated; considering later archival on
+                  CD-R media it is a good idea to avoid such long filenames
+                  altogether.
+
+              General Remarks / Recommended Usage Philosophy:
+                - Archive your data frequently (e.g., once every week) - this
+                  also assures the data are present on multiple archive media,
+                  which avoids data loss due to bad / mis-handled media.
+                - You don't need to clean out the files in your archive
+                  (source) directory - just archive periodically; once the
+                  amount of data exceeds the capacity of your archival media,
+                  "makecd" will automatically archive the most recent data
+                  up to the media capacity. Eventually (when the harddisk gets
+                  nearly full) you may want to remove old data.
+                - When excluding data due to capacity restrictions, "makecd"
+                  excludes data in "chunks" of directories found directly in
+                  the source directory, i.e., it is NOT a good idea to specify
+                  a source directory with only one or very few subdirectories!
+                - If you haven't archived yet, but your data already exceed
+                  the capacity of the media, you can use "makecd -old". If
+                  this does NOT cover all data that can otherwise not be
+                  archived (with the default "-recent" mode), then you need
+                  to remove the data that are archived with "makecd -old",
+                  call "makecd -old" again - and if necessary repeat this
+                  procedure until "makecd" can archive all data (which are not
+                  archived with the "-recent" mode). Once this is done, you
+                  could move the old data back into the archive directory and
+                  from then on use "makecd" with the default "-recent" mode
+                  only.
+                - "mkisofs" which is used by "makecd" to build the ISO9660
+                  disk image is called with the following options (apart from
+                  those used to specify the source & target files, and to
+                  specify the files that are to be excluded explicitly):
+                    -D      retains the directory structure in the specified
+                            source files
+                    -f      Follows symbolic links (+followlinks only)
+                    -J      Joliet extensions: allows using file names up to
+                            32 characters
+                    -m core does not archive files named "core".
+                    -no-bak automatically excludes files with ".bak" extension
+                            and with a "#" or "~" in the filename. The use of
+                            "-no-bak" may be suppressed, but via configuration
+                            file "app-defaults/makecd" ONLY (there is no
+                            argument to "makecd" for this).
+                    -r      Rockridge extensions, for UNIX compatibility; sets
+                            UID and GID to 0 (root:root) and sets the file
+                            permissions to 555 (directories) and 444 (files).
+                    -U      Avoids file naming restrictions: combines the
+                            effect of "-d" (does not introduce trailing dots
+                            with files that don't have an extension), "-l"
+                            (allows for filenames up to 31 characters), "-L"
+                            (allows filenames starting with a period), "-N"
+                            (omits version numbers), "-relaxed-filenames"
+                            (allows special characters in filenames),
+                            "-allow-lowercase" (allows mixed case filenames),
+                            "-allow-multidot", and "-no-iso-translate" (does
+                            not translate "~" and "#" characters).
+                    -v      verbose mode (debugging modes only).
+                  These are the options used with Solaris 9 and Linux; for the
+                  Solaris 8 version of "mkisofs", "-d -D -J -l -L -N -r" and
+                  "-m core" are used, plus "-a" (the opposite of "-no-bak", as
+                  appropriate), plus "-f" and/or "-v", as for the new version
+                  of "mkisofs". See "man mkisofs" for more information.
+
+ Arguments:   The argument order does not matter, EXCEPT that the "target"
+              must be specified after a "-log" option (if specified). Also,
+              the "-sourcedir", "-log", "-size" options (see below) MUST be
+              followed another argument that CANNOT start with a "-".
+              Arguments override the corresponding built-in default setting,
+              as well as any defaults that are set via "app-defaults/makecd"
+              (see above). All command line arguments are optional - for the
+              corresponding default behavior see below.
+
+              "-age [+-]##", "-age [+-]##d", "-age [+-]##m", "-age [+-]#y":
+                by default, each of the modes described above (MODE) looks
+                at all the subfiles / subdirectories in the specified source
+                directory. The "-age" argument permits specifying a relative
+                date limit, i.e., a maximum or minimum age (modification date)
+                for the data to be archived. The "-age" argument MUST be
+                followed by an age specification, and the age MUST be preceded
+                by either a "+' or a "-" indicating mimimum or maximum age:
+                 - To select files of a specified MINIMUM AGE ("files older
+                   than ... ", i.e., to enter a RELATIVE minimum date limit)
+                   you specify an integer that is preceded by a "+". The
+                   integer may be followed by a unit character:
+                        +30     (files modified MORE THAN 3e days ago)
+                        +30d    (ditto)
+                        +8m     (files modified MORE THAN 8 months ago)
+                        +2y     (files modified MORE THAN 2 years ago)
+                   A year is taken as 365.25 days, a month is 365.25/12 days,
+                   i.e., "a month ago" may not be quite the day you expect!
+                 - To select files of a specified MAXIMUM AGE ("files up to
+                   the age of ... ", i.e., to enter a RELATIVE MAXIMUM date
+                   limit) you specify an integer that is preceded by a "-".
+                   The integer may again be followed by a unit character:
+                        -30     (files modified UP TO 30 days ago)
+                        -30d    (ditto)
+                        -8m     (files modified UP TO 8 months ago)
+                        -2y     (files modified UP TO 2 years ago)
+                   See above for the definition of the "m" and "y" units.
+                Note that the "-age" and "-date" arguments are mutually
+                exclusive, i.e., the "-age" argument can NOT BE COMBINED with
+                the "-date" or "-datelimit" argument (see below). The default
+                for the "-age" option is "none" (no limit); a default can be
+                specified through "app-defaults/makecd", via the "DATELIMIT"
+                definition.
+
+              "-confirm" causes "makecd" to ask the user to confirm the
+                selected settings prior to starting the archival process, and
+                to prompt the user to insert archival media (with direct
+                archiving to removable media only, of course). By default, the
+                "confirm" mode is off, unless multiple archival copies are
+                requested (see "-number" option below), or if the interactive
+                mode is selected (see "-interactive" option below). The
+                default for the "confirm" mode can be altered through
+                "app-defaults/makecd", via the "CONFIRM" definition.
+                "-confirm" also affects the behavior with subdirectories that
+                exceed the media size: unless the "-skip" option (see below)
+                is selected, the user is prompted whether to abort the
+                archival process or whether to skip such files.
+                "-confirm" is included / automatically activated with both the
+                "-down" and the "-up" options.
+
+              "-date yyyy-mm-dd" or "-datelimit yyyy-mm-dd" permit specifying
+                an (absolute) limit for the date of last modification for the
+                the data to be archived: with the "recent" (default) and the
+                "down" modes, the date limit means "data created AFTER OR ON
+                the specified date", with the "up" and "old" modes, the date
+                limit means "data created UP TO (OR ON) the specified date".
+                The general format for this is "[0-9][-/.0-9][0-9]", i.e., the
+                date MUST start and end with a numeric character. The date
+                MUST be specified in one of the following formats, which are
+                all derived from the ISO 8601 standard (yyyy-mm-dd): either
+                        <<<yy>yy>mm>dd
+                Examples (assuming the current date os 2004-11-13):
+                        18              same as 2004-10-18
+                        1201            same as 2003-12-01
+                        991201          same as 1999-12-01
+                        20011201        same as 2001-12-01
+                month and day MUST be given in two-digit format, the year may
+                be specified with or without 2 century digits. If the year or
+                the month and year are not specified, the current (or last)
+                month and/or year are assumed. Alternatively, the format
+                        <<<yy>yy[-/.]><m>m[-/.]><d>d
+                i.e., "-", "/" or "." can be used as separators - in this
+                case, one-digit month or day entries are allowed. Examples,
+                again assuming the current date is 2004-11-13:
+                        2001/12/01      same as 2001-12-01
+                        2001.12.01      same as 2001-12-01
+                        99-2-3          same as 1999-02-03
+                        12-3            same as 2003-12-03
+                        2/3             same as 2004-02-03
+                        23              same as 2004-10-23
+                        3               same as 2004-11-03
+                Note that the "-age" and "-date" arguments are mutually
+                exclusive, i.e., the "-age" argument (see above) CANNOT BE
+                COMBINED with the "-date" or "-datelimit" argument. The
+                default for the "-date" option is "none"; a default can be
+                specified through "app-defaults/makecd", via the "DATELIMIT"
+                definition.
+
+              "-debug" or "-debug 1" turns on simple debugging output (level
+                1); "-debug 2" turns on verbose debugging output (level 2).
+                The default debugging level is 0 (off); the default
+                level can be altered in "app-defaults/makecd", by setting the
+                "DEBUGLEVEL" definition. With the "-print" & "-query" options,
+                or if with the "-confirm" or "-interactive" the program is
+                aborted before it starts analyzing the source directory or
+                creating an ISO9660 file system, the "-debug" option (and the
+                associated settings in the configuration file) have no effect
+                (except that the debugging level is indicated in the output),
+                as the debugging only affects the parts of the script that
+                analyze the source directory, create an ISO9660 file system or
+                write data directly to archival media.
+
+              "-down" causes "makecd" to start archiving the most recent
+                files, continuing on to the oldest ones (reverse chronological
+                order). If the data in the source directory exceed the
+                capacity of the media, "makecd" will prompt the user to insert
+                fresh (empty) media. The modes "-down", "-old", "-recent", and
+                "-up" are mutually exclusive. The default archival mode is
+                "-recent"; this default can be altered in the configuration
+                file "app-defaults/makecd", by activating or setting the
+                "ARCHIVEMODE" definition.
+                "-down" automatically enables/includes the "-confirm" option.
+
+              "+followlinks" causes "makecd" to follow links (as if they were
+                real files). See also "-followlinks" option.
+
+              "-followlinks" causes "makecd" NOT to follow links (links will
+                be archived as such and may point to non-existent files in the
+                archive). "-followlinks" and "+followlinks" are mutually
+                exclusive. The DEFAULT link mode is "-followlinks"; this
+                default can be altered in "app-defaults/makecd", via the
+                "FOLLOWLINKS" definition. In the archiving, "-followlinks" is
+                the safer choice: "+followlinks" will yield errors if there
+                are recursive links (this may happen in software development
+                directories), causing such files to be excluded from the
+                archival. Also, with directories such as "/vnmr" we STRONGLY
+                recommend NOT to use the "+followlinks" option, as this will
+                cause problems when restoring such directories from the
+                archival copy.
+
+              "-help" prints help information & exits (no other action taken).
+
+              "-interactive" causes "makecd" first to parse the configuration
+                files (if present), then any other command line arguments,
+                then it guides the user through these settings, which can all
+                be altered in an interactive dialog. The interactive mode
+                disables the "-print" argument, if specified; on the other
+                hand, it automatically includes the "confirm" mode.
+
+              "-log log_file" specifies the log file or logging directory. The
+                argument following the "-log" option MUST be a path. If a
+                relative path is specified, it is taken relative to the
+                working directory in which "makecd" is called. If the
+                specified path is an existing directory, a log file named
+                "cd_log_{date_timestamp}" will be created in that directory.
+                The default logging target can be specified in the
+                configuration file "app-defaults/makecd", by setting the "LOG"
+                definition. If no such default exists and no "-log" argument
+                is specified, a log file "cd_log_{date_timestamp}" will be
+                created in "~/vnmrsys/archive_logs".
+                Relative path names will be interpreted as relative to the
+                working directory (unlike in "app-defaults/makecd", where they
+                are taken as relative to the user's home directory!).
+                The log file includes
+                 - a detailed header describing all archival settings
+                 - a list of files which cannot be archived due to file system
+                   loops caused by symbolic links ("+followlinks" option only)
+                 - a list of the archived subfiles and -directories within the
+                   source directory
+                 - the exact commands used to create the ISO9660 file system
+                   and (if used) to write data to archival media
+                 - all output generated by "mkisofs" and "cdrw" or "cdrecord"
+                   (if used); when writing multiple copies, only the output
+                   from the first copy is logged. Note that the amount of
+                   output from these commands is also controlled by the
+                   "-debug" argument (debugging level).
+                If the log file is NOT in the user's home directory, AND if
+                the log file has a timestamp added to its name, "makecd" will
+                create symbolic links "last_archivelog" in the user's home
+                directory, in the log directoryi (if applicable), as well as
+                in the target directory (if an ISO9660 image is created),
+                pointing to that log file - PROVIDED the archival process
+                completes successfully.
+
+              "-manual" displays the manual file using "more" and exits (no
+                other action taken).
+
+              "-number #" specifies the number of copies made; this option is
+                only active if "target" is specified such that the output is
+                fed into "cdrw" directly (if the "target" is a file or a
+                directory on the harddisk, this argument is ignored. The
+                "-number" option MUST be followed by a numeric (integer)
+                argument. The default number of of copies is 1. This default
+                can be altered by the configuration file "app-defaults/makecd"
+                by activating / setting the "NUMBER_COPIES" definition. If the
+                number of copies is 2 or more, this enforces the "confirm"
+                mode ("-confirm" option, see above).
+
+              "-old" causes "makecd" only to archive the oldest files (up to
+                the archival media capacity) in case the data in the source
+                directory exceed the capacity of the media. The modes "-down",
+                "-old", "-recent", and "-up" are mutually exclusive. See
+                also the "-recent" option below.
+
+              "-print" causes "makecd" to parse the configuration files and
+                all command line arguments, then just to display the resulting
+                settings, without taking any real action. With the "-print"
+                option, the "confirm" mode ("-confirm" argument) has no
+                effect. The "interactive" mode ("-interactive" argument, see
+                above) disables the "-print" option.
+
+              "-query" prints out a short list with the current command
+                settings (from the configuration file(s) and possibly other
+                arguments), no further action is taken. This is mainly meant
+                as interface for utilities calling "makecd". The "-confirm"
+                and "-print" options have no effect when "-query" is un use,
+                "-interactive" can NOT be used together with "-query".
+
+              "-recent" causes "makecd" only to archive the most recent
+                files (up to the archival media capacity) in case the data in
+                the source directory exceed the capacity of the media. The
+                modes "-down", "-old", "-recent", and "-up" are mutually
+                exclusive. The default archival mode is "recent"; this default
+                can be altered in "app-defaults/makecd", by activating or
+                setting the "ARCHIVEMODE" definition.
+
+              "-size #_MBytes" specifies the maximum capacity of the archival
+                media, in MBytes. The "-size" option MUST be followed by a
+                numeric (integer) argument. The default media size is 650
+                MBytes (standard CD-R). This default can be altered in
+                "app-defaults/makecd", via the "MEDIASIZE" definition.
+
+              "-skip" causes "makecd" to skip subdirectories that exceed the
+                media size (with a warning message, also in the log). "-skip"
+                ignores the "-confirm" option, i.e., even if "-confirm" is
+                specified, "-skip" causes "makecd" to skip files in the above
+                case (no question asked). This can also be activated through
+                the configuration file "app-defaults/makecd", via the "SKIP"
+                definition.
+
+              "-sourcedir source_dir" specifies the directory with the data
+                that are to be archived.  The argument following the "-a" or
+                "-sourcedir" option MUST be a path to an existing directory.
+                If a relative path is specified, it is taken relative to the
+                working directory in which "makecd" is called. The default
+                directory to be archived is "~/vnmrsys/data/studies" (used
+                with VnmrJ), or (e.g., with VNMR, where "vnmrsys/data/studies"
+                is not present) "~/vnmrsys/data", or (if that is not present,
+                too) "~/data"; the default can be altered in the configuration
+                file "app-defaults/makecd", via the "SOURCEDIR" definition.
+                Currently, "makecd" supports ONE source directory only.
+                Relative path names will be interpreted as relative to the
+                working directory (unlike in "app-defaults/makecd", where they
+                are taken as relative to the user's home directory!).
+
+              "-speed #" specifies the speed used by the CR-R/RW drive. This
+                is only used when directly writing to CD-R/RW. The default (0)
+                uses the drive's default speed (which may be too fast for the
+                media in use!). The "-speed" option MUST be followed by a
+                numeric (integer) argument: 4 means "4x" speed (upon writing).
+                This default can be altered in "app-defaults/makecd", via the
+                "SPEED" definition.
+
+              "target" specifies the path for archiving target. If the
+                specified path is relative, it is taken relative to the
+                working directory in which "makecd" is called. If the
+                specified target is a directory, the ISO9660 image is created
+                as a subfile named "cd_{date_timestamp}.iso"; if it is NOT a
+                directory, it is assumed to be the filename for the ISO9660
+                disk image (if no ".iso" extension is specified, this will be
+                added automatically). If the target is a plain file that
+                already exists from an earlier "makecd" call, it will be
+                overwritten. If the target is one of "cdrom", "cdrom[0-9]", or
+                "c#t#d#s#", "/dev/(r)dsk/c#t#d#s#", or "c#t#d#", or
+                "/dev/(r)dsk/c#t#d#" (see "man cdrw"), the output is fed
+                (piped) into the "cdrw -i" command (and written to CD-R) and
+                will NOT be stored on the harddisk at all. This is also the
+                case if the target is "/dev/cdrw" - but this will cause "cdrw"
+                to use its default device. In Solaris 8 (and Linux), the
+                command "cdrecord" is used instead of "cdrw". In Linux, the
+                target device for "cdrecord" will typically be defined in an
+                environment variable (so "/dev/cdrw" can be specified with
+                "makecd"), but "atapi:0,0,[01]" is also accepted as target
+                device in "makecd".
+                For ISO9660 images, relative path names will be interpreted as
+                relative to the working directory (this is different from
+                "app-defaults/makecd", where they are taken as relative to the
+                user's home directory!).
+                Note that the specified device for "cdrw" CANNOT be a device
+                currently defined / mounted as UFS file system. The default
+                target is a file "~/vnmrsys/cd_{date_timestamp}.iso" (i.e., a
+                file on the harddisk, NOT the CD-R). This default can be
+                altered via "app-defaults/makecd", by setting the "TARGET"
+                definition.
+
+              "-test" performs a "dry run" (simulation run) in burning media:
+                the "cdrw" or "cdrecord" command and the burner drive hardware
+                goes through all the motions, but the laser remains turned
+                off, i.e., no data are actually written to the archival media.
+                This permits checking whether burning works without buffer
+                underrun at a given drive / writing speed and system load. If
+                such a test run fails, select a lower drive / burning sped
+                and repeat the test. CD-R media can be burnt only once; in the
+                case of a buffer underrun the media will remain unusable! The
+                test mode can also be selected from the interactive mode. When
+                writing ISO9660 disk images only, the "-test" argument has no
+                effect. After a test / simulation run, the log file will be
+                stored in the user's home directory, as "makecd_testrun.log".
+
+              "-up" causes "makecd" to start archiving the oldest files,
+                continuing on to the most recent ones (chronological order).
+                If the data in the source directory exceed the capacity of the
+                media, "makecd" will prompt the user to insert fresh (empty)
+                media. The modes "-down", "-old", "-recent", and "-up" are
+                mutually exclusive. The default archival mode is "-recent";
+                this default can be altered in the configuration file
+                "app-defaults/makecd", by activating or setting the
+                "ARCHIVEMODE" definition.
+                "-up" automatically enables/includes the "-confirm" option.
+
+              "-version" prints the command revision level and version date
+                (timestamp) and exits (no other action taken).
+
+              "-volname" specifies the ISO9660 volume name that is used as
+                secondary mount point with the Solaris "volmgt", or used as
+                disk name in MacOS X / MS Windows. "makecd" automatically
+                creates and uses a volume name when creating the ISO9660 disk
+                image. Besides that built-in default volume name (see below),
+                the volume name can be set / configured in this file. The
+                volume name can be specified as a simple, fixed string -
+                however, this is NOT recommended (except when done via
+                "-volname" command line argument), as it would lead to the
+                creation of multiple archives with identical volume name,
+                causing confusion with later data recovery from archival
+                media. Alternatively (and much preferably), a volume name can
+                be defined as a "template", using using symbolic placeholders
+                that will be converted to "real values" when "makecd" is
+                running. The list below describes the available placeholders:
+                        %HOST%       -> system host name ("uname -n")
+                        %USER%       -> login of the user running "makecd"
+                        %DIR%        -> basename of the source directory
+                        %DATE%       -> (archiving) date in ISO format, e.g.,
+                                        2004-11-13
+                        %Y%          -> 4-digit year (archiving date)
+                        %M%          -> 2-digit month (01 .. 12)
+                        %MONTH%      -> month (Jan .. Dec)
+                        %D%          -> 2-digit day (01 .. 31)
+                        %WEEKDAY%    -> day of the week (Mon .. Sun)
+                        %TIME%       -> archiving time (HHhMM, e.g., 15h25)
+                The default volume name (built-in template) is
+                        %HOST%-%USER%_%DIR%_%DATE%
+                yielding a volume name such as
+                        ui600-vnmr1_data_2004-11-13
+                This default may also be changed via "app-defaults/makecd", by
+                setting the "VOLNAME" definition.
+                IMPORTANT NOTES:
+                 - The total length of the volume name cannot exceed 32
+                   characters. If "-%DATE%", "_%DATE%" or just "%DATE%" is at
+                   the end of the template, the preceding part may be
+                   truncated, in all other cases the overall result is
+                   truncated, in order to make the result fit into 32 chars.
+                 - Although from a Windows and MacOS point-of-view blanks in
+                   the volume name are OK, in a UNIX world this is doable, but
+                   leads to unnecessary complications - it's better to avoid
+                   blanks; "makecd" will translate blanks in the volume name
+                   to "_" (underscore) characters. If your template includes
+                   blank characters, you need to enclose the template string
+                   in quotes (use double quotes if it uses any special
+                   characters such as "$!*?[]{}&~" which would otherwise be
+                   interpreted by the UNIX shell.
+                 - From a point-of-view of Windows compatibility is may also
+                   be advisable NOT to use colons (":") and dots (".") in the
+                   volume name - but "makecd" will leave these untouched.
+
+              With most of the options, you don't need to type the full option
+              name - only enough to make it clear which option is meant. The
+              REQUIRED part of the option names is indicated with upper case
+              characters below (all options are actually case-insensitive):
+                -Age         +Followlinks -Manual      -Recent      -Test
+                -Confirm     -Followlinks -Number      -SIze        -Up
+                -DAtelimit   -Help        -Old         -SKip        -VErsion
+                -DEbug       -Interactive -Print       -SOurcedir   -VOlname
+                -DOwn        -Log         -Query       -SPeed
+
+              In other words, "-a", "-c", "-da" "-de", "-do", "+f", "-f",
+              "-h", "-i", "-l", "-m", "-n", "-o", "-p", "-q", "-r", "-si",
+              "-sk", "-so", "-sp", "-t", "-u", "-ve" and "-vo" are sufficient
+              (the remainder of the option name isn't even checked) - but in
+              the context of a shell script or a macro calling "makecd" it may
+              still be helpful or recommended to specify the full option name
+              for reasons of clarity. NOTE:
+                - you CANNOT concatenate any options, e.g., by using "-no" in
+                  lieu of "-n -o";
+                - "-d", "-s" and "-v" are REJECTED because they are ambiguous.
+
+ Examples:    makecd -h
+              makecd -help
+              makecd -man
+              makecd -manual
+              makecd -ve
+              makecd -version
+              makecd -debug 1 -f -o -source ~/nmrdata -l ~/logs ~/archive.iso
+              makecd -sourcedir ~/nmrdata -log ~/logs ~/archivedir/1106
+              makecd -n 2 +f -o -sk -so ~/vnmrsys/data c0t6d0s0
+              makecd -number 2 +followlinks -old /dev/cdrw
+              makecd -i +f cdrom
+              makecd -confirm +followlinks -skip -speed 12 -test cdrom1
+              makecd -interactive +followlinks -speed 12 cdrom1
+              makecd -n 2 +f -t /dev/rdsk/c0t6d0s0
+              makecd -number 2 +followlinks -old c0t6d0s0
+
+ Related:     imakecd - Interactively Write Data to ISO9660 Archive / CD-R (M)
+              makecd - Write ISO9660 Archive File / Archive Data on CD-R (M)
+
+*******************************************************************************
+                                        makecd version 1.0.4 (2010-11-09_13:00)

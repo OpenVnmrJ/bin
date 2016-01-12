@@ -1,0 +1,83 @@
+#!/bin/sh
+
+tail=`which tail`
+if [ `uname` = SunOS ]; then
+  awk=nawk
+  tail=/usr/xpg4/bin/tail
+else
+  awk=awk
+fi
+if [ x$vnmruser = x ]; then
+  vnmruser=$HOME/vnmrsys
+fi
+wd=`pwd`
+cd $vnmruser
+ld=`pwd`
+cd $wd/makecd
+tar cf - maclib manual | (cd $wd; tar xvfBp -)
+if [ $wd = $ld ]; then
+  td=$HOME
+else
+  td=$wd
+fi
+if [ -f app-defaults/makecd ]; then
+  tf=$td/app-defaults/makecd
+  if [ -f $tf ]; then
+    if [ `grep -c '^[ ]*[A-Z]' < $tf` -gt 0 ]; then
+      cd app-defaults
+      grep '^[ ]*[A-Z]' < $tf > makecd.active
+      ix=1
+      while [ $ix -le `wc -l < makecd.active` ]; do
+        l=`head -n $ix makecd.active | $tail -n 1`
+        (echo $l; cat makecd) | $awk 'BEGIN {
+          getline
+	  newline=$0
+	  item=$1
+          xferred=0
+          xtrahead=0
+        }
+        {
+          inactive="!" item
+	  if ($1 == inactive)
+	  {
+	    while ($1 == inactive)
+	    {
+	      print
+	      getline
+	    }
+	    print newline
+	    printf("\n")
+	    if (NF > 0)
+	    {
+	      print
+	    }
+	    xferred=1
+	  }
+          else
+	    print
+	  if ($0 ~ /^# EXTRA ACTIVE LINES FROM PREVIOUS FILE:$/)
+	    xtrahead++
+        }
+	END {
+	  if (xferred == 0)
+	  {
+	    if (xtrahead == 0)
+	    {
+	      printf("\n#\n# EXTRA ACTIVE LINES FROM PREVIOUS FILE:\n#\n")
+            }
+	    print newline
+	  }
+	}' > makecd.tmp
+	mv makecd.tmp makecd
+	ix=`expr $ix + 1`
+      done
+      cd ..
+    fi
+  fi
+  tar cf - app-defaults | (cd $td; tar xvfBp -)
+fi
+if [ -d bin ]; then
+  tar cf - bin | (cd $td; tar xvfBp -)
+fi
+cd $wd
+rm -rf makecd $0

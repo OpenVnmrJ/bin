@@ -1,0 +1,20 @@
+if ($0 = 'makecd') then
+  $cmd = 'xterm -geometry 80x60 -sb -sl 1000 -e makecd '
+  $str = ''
+  $argno = ''
+  $ix = 1
+  while ($ix <= $#) do
+    format($ix,1,0):$argno
+    if (typeof('$'+$argno)) then
+      $cmd = $cmd + ${$ix} + ' '
+    else
+      format(${$ix},1,0):$str
+      $cmd = $cmd + $str + ' '
+    endif
+    $ix = 1 + $ix
+  endwhile
+  $cmd = $cmd + '&'
+else
+  $cmd = 'xterm -geometry 80x60 -sb -sl 1000 -e makecd -i &'
+endif
+shell($cmd):$dummy

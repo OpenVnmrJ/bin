@@ -1,0 +1,22 @@
+
+*******************************************************************************
+ imakecd - Interactively Write Data to ISO9660 Archive / CD-R  (M)
+*******************************************************************************
+
+ Syntax:      imakecd
+
+ Description: "imakecd" is a VnmrJ / VNMR macro that opens a UNIX shell window
+              in which the shell script "makecd" is run in interactive mode.
+              As the archival process may take several minutes, the shell
+              window is opened in background mode, such that VnmrJ / VNMR
+              remains usable during the archival process. However, note that
+              it is advisable NOT to alter data in the archival source
+              directory while the archival is in progress!
+
+ Examples:    imakecd
+
+ Related:     makecd - Write ISO9660 Archive File / Archive Data on CD-R (M)
+              makecd - Write ISO9660 Archive File / Archive Data on CD-R (U)
+
+*******************************************************************************
+                                        makecd version 1.0.4 (2010-11-09_13:00)

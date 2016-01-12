@@ -1,0 +1,330 @@
+#
+# makecd - configuration file for "makecd" command, see manual/makecd.
+#
+# To activate an entry, remove the exclamation mark ("!") from the 
+# corresponding line below and set the value on that line, if necessary /
+# appropriate (some options work with a fixed set of values, in which case
+# just the relevant line needs to be activated).
+# Values marked with "this is the built-in default" DON'T need to be activated
+# (except of course if you have altered the "bin/makecd" shell script).
+# Note that if multiple lines with the same keyword (LHS) are activated, the
+# last line will be used. If the value on the active line is left empty, the
+# built-in default will be used.
+#
+
+#
+# ARCHIVEMODE:  "recent" (default) selects the most recent data in case the
+#               archival (source) directory contains more data than can be
+#               written to an archive disk (see MEDIASIZE option below).
+#               "old" would select the oldest data in the archival directory
+#               in such a case. "down" starts archiving at the most recent
+#               files, down to the oldest ones (prompting for more media, if
+#               necessary); "up" starts archiving with the oldest files, up to
+#               the oldest ones (also prompting for more media, if necessary).
+#
+!ARCHIVEMODE    = recent        # this is the built-in default
+!ARCHIVEMODE    = down
+!ARCHIVEMODE    = old
+!ARCHIVEMODE    = up
+
+#
+# CONFIRM:      TRUE (or YES) causes "makecd" to prompt the user to insert
+#               archival media; used with direct archiving to removable media
+#               only. By default, the "confirm" mode is off, unless multiple
+#               copies or the interactive mode are requested. If the latter is
+#               the case (either through the COPIES & INTERACTIVE definitions
+#               below or via command line arguments, the "confirm" mode is
+#               enforced.
+#
+!CONFIRM        = FALSE         # this is the built-in default
+!CONFIRM        = TRUE          
+
+#
+# DATELIMIT:    by default, each of the modes described above (MODE) looks
+#               at all the subfiles / subdirectories in the specified source
+#               directory. The "DATELIMIT" option permits adding a "date/age
+#               limit to the archiving file selection. There are two types of
+#               date limits, relative and absolute; the relative limits can be
+#               specified as upper or as lower (age) limit:
+#                - select files of a specified MINIMUM AGE ("files older
+#                  than ... ", i.e., a RELATIVE date limit). This is done by
+#                  specifying an integer that MUST be preceded by a "+", and
+#                  the integer can be followed by an optional unit character:
+#                       +30     (files created MORE THAN 3e days ago)
+#                       +30d    (ditto)
+#                       +8m     (files created MORE THAN 8 months ago)
+#                       +2y     (files created MORE THAN 2 years ago)
+#                  A year is taken as 365.25 days, a month is 365.25/12 days,
+#                  i.e., "a month ago" may not be quite the day you expect!
+#                - select files of a specified MAXIMUM AGE ("files up to the
+#                  age of ... ", i.e., a RELATIVE date limit). This is done by
+#                  specifying an integer that MUST be preceded by a "-", and
+#                  the integer can be followed by an optional unit character:
+#                       -30     (files created UP TO 30 days ago)
+#                       -30d    (ditto)
+#                       -8m     (files created UP TO 8 months ago)
+#                       -2y     (files created UP TO 2 years ago)
+#                  See above for the definition of the "m" and "y" units.
+#                - specify a "deadline date": the general format for this is
+#                  "[0-9][-/.0-9][0-9]", i.e., the date MUST start and end
+#                  with a numeric character. The date MUST be specified in one
+#                  of the following formats, which are all derived from the
+#                  ISO 8601 standard (yyyy-mm-dd): either
+#                       <<<yy>yy>mm>dd
+#                  Examples (assuming the current date os 2004-11-13):
+#                       18              same as 2004-10-18
+#                       1201            same as 2003-12-01
+#                       991201          same as 1999-12-01
+#                       20011201        same as 2001-12-01
+#                  month and day MUST be given in two-digit format, the year
+#                  may be specified with or without 2 century digits. If the
+#                  year or the month and year are not specified, the current
+#                  (or last) month and/or year are assumed. Alternatively, the
+#                  format
+#                       <<<yy>yy[-/.]><m>m[-/.]><d>d
+#                  i.e., "-", "/" or "." can be used as separators - in this
+#                  case, one-digit month or day entries are allowed. Examples
+#                  (again assuming the current date is 2004-11-13):
+#                       2001/12/01      same as 2001-12-01
+#                       2001.12.01      same as 2001-12-01
+#                       99-2-3          same as 1999-02-03
+#                       12-3            same as 2003-12-03
+#                       2/3             same as 2004-02-03
+#                       23              same as 2004-10-23
+#                       3               same as 2004-11-03
+#               The functionality of the RELATIVE limits is obvious; the
+#               functionality of ABSOLUTE date limits depends on the active
+#               mode:
+#                - with the "up" and "old" modes, an absolute date limit means
+#                  "data created UP TO (OR ON) the specified date";
+#                - with the "recent" and "down" modes, an absolute date limit
+#                  means "data created AFTER OR ON the specified date".
+#               The RELATIVE date/age limit can also be altered via the "-age"
+#               command line argument (which supersedes any setting below),
+#               ABSOLUTE limits (with the creation date) can also be specified
+#               using the "-date" or "-datelimit" argument (which again
+#               supersedes any setting below).
+#
+!DATELIMIT      = none          # this is the built-in default
+!DATELIMIT      = -30           # archive files that are up to 30 days old
+!DATELIMIT      = +30           # archive files that are more than 30 days old
+!DATELIMIT      = -6m           # archive files that are up to 6 months old
+!DATELIMIT      = +2y           # archive files that are more than 2 years old
+!DATELIMIT      = 2004-01-01    # absolute date as date limit (yyyy-mm-dd)
+!DATELIMIT      =
+
+#
+# DEBUGLEVEL:   This is primarily meant for development / debugging purposes.
+#               Level 0 produces moderate amounts of output (telling you what
+#               the output files are, giving you periodic feedback in steps
+#               that may be very slow). THIS IS THE RECOMMENDED MODE.
+#               Level 1 activates standard debugging output, commenting some
+#               of the steps that the program performs.
+#               Level 2 adds (potentially) LOTS of output from the "mkisofs"
+#               calls on top of the level 1 output.
+#
+!DEBUGLEVEL     = 0             # this is the built-in default (RECOMMENDED)
+!DEBUGLEVEL     = 1             # adds debugging output
+!DEBUGLEVEL     = 2             # adds MORE debugging output
+
+#
+# FOLLOWLINKS:  TRUE (or YES) causes "mkisofs" (called by "makecd") to follow
+#               symbolic links and to archive the link target ("-f" option);
+#               "FALSE" causes "mkisofs" to archive just the symbolic link
+#               itself, as such ("-nf" option with "mkisofs"); note that this
+#               may create symbolic links in the archive that point to
+#               non-existent paths, unless the link contains a) a relative
+#               path, and b) the link target is also within the archive AND
+#               archived together with the link.
+#               On the other hand, "FALSE" is more failsafe than "TRUE" in the
+#               archiving: FOLLOWLINKS = TRUE will yield errors if there are
+#               recursive links (this may happen in software development
+#               directories), causing such files to be excluded from the
+#               archival. Also, with directories such as "/vnmr" we STRONGLY
+#               recommend NOT to use the "FOLLOWLINKS" option, as this will
+#               cause problems when restoring such directories from the
+#               archival copy.
+#
+!FOLLOWLINKS    = FALSE         # this is the built-in default
+!FOLLOWLINKS    = TRUE
+
+#
+# NOBAK:        TRUE or FALSE: controls the use of the "-no-bak" (or "-nobak")
+#               option in "mkisofs" (or the "-a" option with opposite logic in
+#               the older version of "mkisofs"). The meaning of these choices
+#               is as follows:
+#                - "FALSE" suppresses the "-no-bak" option  / activates the
+#                  "-a" option in the older version of "mkisofs"). This means
+#                  that files with a name ending in ".bak" or "~" (typically
+#                  backup copies created automatically by software such as
+#                  text editors), or files with a name containing "#" are NOT
+#                  ARCHIVED. Note that NOBAK = FALSE is the DEFAULT.
+#                - "TRUE" is the opposite ("-nobak" is not used, "-a" is used
+#                  with the old version of "mkisofs"): backup files and files
+#                  with a "#" in the filename are INCLUDED in the archive.
+#               If in your environment filenames with "#" are in use, and/or
+#               if you want the above backup copies to be included in the
+#               archive, you MUST set the NOBAK option to FALSE. Currently,
+#               this can be controlled via this configuration file ONLY (no
+#               command line argument).
+#
+!NOBAK          = FALSE         # this is the built-in default
+!NOBAK          = TRUE
+
+#
+# INTERACTIVE:  TRUE (or YES) causes "makecd" to work in interactive mode,
+#               i.e., after parsing the configuration file(s) (if present)
+#               and any command line arguments, the user is guided through
+#               the various options, with explanations and indication of the
+#               current default setting. The interactive mode enforces the
+#               "confirm" mode.
+#
+!INTERACTIVE    = FALSE         # this is the built-in default
+!INTERACTIVE    = TRUE
+
+#
+# LOG:          Specifies the log file or logging directory; an absolute path
+#               (starting with "/") should be specified.
+#               If the specified path is an existing directory, a log file
+#               named "cd_log_{date_timestamp}" will be created in that
+#               directory. If no default is specified and no "-l<og>" argument
+#               is specified with "makecd", the log file will be created as
+#               "~/vnmrsys/archive_logs/cd_log_{date_timestamp}".
+#               If the log file is NOT in the user's home directory, AND if
+#               the log file has a timestamp added to its name (see above),
+#               "makecd" will create a symbolic link "last_archivelog" in the
+#               user's home directory, in the log directory (if applicable),
+#               and in the target directory (if an ISO9660 image file is
+#               created), pointing to that log file - PROVIDED the archival
+#               process completes successfully.
+#               Relative path names will be interpreted relative to the user's
+#               home directory, but "$HOME" and "~" are also allowed.
+#
+!LOG            = 
+
+#
+# MEDIASIZE:    Media size in MBytes; the default for standard CD-R disks is
+#               650 MBytes.
+#
+!MEDIASIZE      = 650           # in MBytes, this is the built-in default
+
+#
+# NUMBER_COPIES: Number of copies made - only used if the target is "/dev/*"
+#               or a device recognized by "cdrw", see "TARGET". Default: 1
+#               If the number of copies is 2 or more, this forces "makecd" to
+#               use the "confirm" mode
+#
+!NUMBER_COPIES  = 2
+
+#
+# SOURCEDIR:    specifies the directory with the data that are to be archived.
+#               The default is ~/vnmrsys/data/studies or (if that is absent)
+#               ~/vnmrsys/data or (if that is absent) ~/data
+#               Relative path names will be interpreted relative to the user's
+#               home directory, but "$HOME" and "~" are also allowed.
+#
+!SOURCEDIR      = 
+
+#
+# SKIP:         If there are subdirectories that exceed the media size; these
+#               are simply skipped with a warning message (also in the log);
+#               the default behavior is to abort the archiving or, if the
+#               CONFIRM option below ("-confirm" argument) is active, the user
+#               will be asked whether to skip the file or whether to abort.
+#
+!SKIP           = FALSE         # this is the built-in default
+!SKIP           = TRUE
+
+#
+# SPEED:        CD-R/RW speed; the default (0) is to use the drive's default
+#               speed. The speed must be an integer (4 means "4x"). This is
+#               of course only used when writing to CD-R disk directly
+#
+!SPEED          = 0             # this is the built-in default
+!SPEED          = 4
+
+#
+# TARGET:       specifies the path for archiving target; an absolute path
+#               (starting with "/") should be specified.
+#               If the specified target is a directory, the ISO9660 image is
+#               created as a subfile named "cd_{date_timestamp}.iso"; if it is
+#               NOT a directory, it is assumed to be the filename for the
+#               ISO9660 disk image (if no ".iso" extension is specified, this
+#               will be added automatically). If the target is a plain file
+#               that already exists from an earlier "makecd" call, it will be
+#               overwritten. If the target is "cdrom[0=9]" or "c#t#d#s#" or
+#               "/dev/(r)dsk/c#t#d#s#" or "c#t#d#" or "/dev/(r)dsk/c#t#d#"
+#               (see "man cdrw"), the output is fed (piped) into the "cdrw -i"
+#               command (and written to CD-R) and will NOT be stored on the
+#               harddisk at all. This is also the case if the target is
+#               "/dev/cdrw" - but this will cause "cdrw" to use its default
+#               device. Note that the specified device for "cdrw" CANNOT be a
+#               device currently defined / mounted as UFS file system.
+#               In Solaris 8 (and Linux), the command "cdrecord" is used
+#               in lieu of "cdrw". In Linux, the target device for "cdrecord"
+#               will usually be defined in an environment variable (therefore
+#               "/dev/cdrw" can be specified below / with "makecd"), but
+#               "atapi:0,0,[01]" is also accepted as target device.
+#               The default "makecd" target is an ISO9660 disk image named
+#               "cd_{date_timestamp}.iso" in "~/vnmrsys/" (i.e., a file on the
+#               harddisk, NOT the CD-R).
+#               Relative path names will be interpreted relative to the user's
+#               home directory, but "$HOME" and "~" are also allowed.
+!TARGET         = /dev/cdrw     # causes "cdrw" to use its default device
+!TARGET         = cdrom         # a device recognized by volmgt
+!TARGET         = cdrom1        # a device recognized by volmgt
+!TARGET         = c0t1d0s0      # cannot be a UFS file system!
+!TARGET         = c0t1d0        # cannot be a harddisk with UFS file systems!
+!TARGET         = /dev/rdsk/c0t1d0s0
+!TARGET         = /dev/rdsk/c0t1d0
+!TARGET         = 
+
+#
+# VOLNAME:      The ISO9660 volume name is used as secondary mount point with
+#               the Solaris "volmgt", or used as disk name in MacOS X / MS
+#               Windows. "makecd" automatically creates and uses a volume name
+#               when creating the ISO9660 disk image. Besides that built-in
+#               default volume name (see below), the volume name can be set /
+#               configured in this file. The volume name can be specified
+#               as a simple, fixed string - however, this is NOT recommended
+#               (except when done via "-volname" command line argument), as it
+#               would lead to a creation of multiple archives with identical
+#               (undistinguishable) volume name, causing confusion with later
+#               data recovery from archival media. Alternatively (and much
+#               preferably), a volume name can be defined as a "template",
+#               using using symbolic placeholders that will be converted to
+#               "real values" when "makecd" is running. The list below
+#               describes the available placeholders:
+#                       %HOST%          -> system host name ("uname -n")
+#                       %USER%          -> login of the user running "makecd"
+#                       %DIR%           -> basename of the source directory
+#                       %DATE%          -> (archiving) date in ISO format,
+#                                          e.g., 2004-11-13
+#                       %Y%             -> 4-digit year (archiving date)
+#                       %M%             -> 2-digit month (01 .. 12)
+#                       %MONTH%         -> month (Jan .. Dec)
+#                       %D%             -> 2-digit day (01 .. 31)
+#                       %WEEKDAY%       -> day of the week (Mon .. Sun)
+#                       %TIME%          -> archiving time (HHhMM, e.g., 15h25)
+#               The default volume name (built-in template) is
+#                       %HOST%-%USER%_%DIR%_%DATE%
+#               IMPORTANT NOTES:
+#                - The total lengthy of the volume name cannot exceed 32
+#                  characters. If "-%DATE%", "_%DATE%" or just "%DATE%" is at
+#                  the end of the template, the preceding part may be
+#                  truncated, in all other cases the overall result is
+#                  truncated, in order to make the result fit into 32 chars.
+#                - Although from a Windows and MacOS point-of-view blanks in
+#                  the volume name are OK, in a UNIX world this is doable, but
+#                  leads to unnecessary complications - it's better to avoid
+#                  blanks; "makecd" will translate blanks in the volume name
+#                  to "_" (underscore) characters.
+#                - From a point-of-view of Windows compatibility is may also
+#                  be advisable NOT to use colons (":") and dots (".") in the
+#                  volume name - but "makecd" will leave these untouched.
+#                - different from the preceding definitions above, you MUST
+#                  NOT HAVE COMMENTS ON ANY ACTIVE LINES BELOW.
+#
+!VOLNAME        = %HOST%-%USER%_%DIR%_%DATE%
+!VOLNAME        = 
+

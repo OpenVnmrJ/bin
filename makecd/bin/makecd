@@ -1,0 +1,3890 @@
+#!/bin/sh
+#
+# makecd - WRITE ISO9660 ARCHIVE FILE OR ARCHIVE DATA ON CD DIRECTLY
+# ===================================================================
+#
+# Syntax:  makecd <-age ###|-date<limit> yyyy-mm-dd> <-confirm> \
+#                 <-debug <level>> <+followlinks|-followlinks> \
+#                 <-interactive> <-log log_file> <-number #> \
+#                 <-old|-up|-recent|-down> <-size #_MiB> \
+#                 <-sourcedir source_dir> <-skip> <-speed #> \
+#                 <-test> <-volname volume_name> <target>
+#          makecd <-age ###|-date<limit> yyyy-mm-dd> <-debug <level>> \
+#                 <+followlinks|-followlinks> <-log log_file> \
+#                 <-number #> <-old|-up|-recent|-down> <-print|-query> \
+#                 <-size #_MiB> <-sourcedir source_dir> <-skip> \
+#                 <-speed #> <-test> <-volname volume_name> <target>
+#          makecd -v<ersion>
+#          makecd -h<elp>
+#          makecd -m<anual>
+#
+#
+#  REVISION HISTORY:
+#------------------------------------------------------------------------------
+# 2004-11-02 - 0.1     rk, Started
+# 2004-11-03 - 0.2     rk, Added configurability / defaults
+#            - 0.3     rk, Added configuration via app-defaults
+# 2004-11-04 - 0.4     rk, Direct write option supports multiple copies
+#            - 0.5     rk, Recognizes valid devices for "cdrw"
+#            - 0.6     rk, Added interactive option
+#            - 0.6.5   rk, Added "mkisofs" version check
+#            - 0.6.6   rk, Default source directory adjusted for pre-VnmrJ
+#            - 0.6.7   rk, "-speed" argument added
+#            - 0.7.1   rk, Output reworked, interactive mode, confirmation
+#            - 0.7.2   rk, Changed handling of app-defaults files
+# 2004-11-05 - 0.7.3   rk, Added partial Solaris 8 compatibility
+#            - 0.7.5   rk, Improved handling / reporting of failures
+#            - 0.7.8   rk, Expanded device checking
+# 2004-11-06 - 0.7.10  rk, Fixed another Linux issue with "which"
+#              0.7.11  rk, -interactive option renamed to -confirm
+#                          -archivedir option renamed to -sourcedir
+#              0.7.12  rk, "-check" option implemented.
+# 2004-11-08 - 0.7.15  rk, "check", "-f"/"-nf", "-copies" renamed
+#              0.7.16  rk, Improved argument checking (report unknown args)
+# 2004-11-09 - 0.7.19  rk, Checking for duplicate and exclusive args
+#              0.7.21  rk, Adds hostname to automatic volname setting
+#              0.7.24  rk, Limit volname length
+#              0.8.1   rk, Proper interactive mode implemented
+# 2004-11-10 - 0.8.2   rk, "-query" option added, catch ambiguous options
+#              0.8.4   rk, Interactive mode complete (number entry added)
+#              0.9.1   rk, Volume name templates and entry added
+#              0.9.2   rk, Avoid recursion when archiving to ISO9660 image
+# 2004-11-11 - 0.9.5   rk, Faster size / capacity checking using "du"
+#              0.9.6   rk, Avoid recursion with archival log file;
+#                          Archival logging vastly improved.
+#                          Support for cdrecord (& Linux?) added (not tested)
+#              0.9.7   rk, Limited partial archiving w/ Solaris 8 / mkisofs
+# 2004-11-14 - 0.9.13  rk, Adjusted "fmt" calls for Linux compatibility.
+#              0.9.14  rk, "-no-bak" in "mkisofs" call can be suppressed.
+#              0.9.15  rk, Inverted logic with "-no-bak" in app-defaults
+# 2004-11-15 - 0.9.16  rk, "-a" for Solaris 8 version of "mkisofs" ("-no-bak")
+#              0.9.17  rk, Fixed bug with "app-defaults" decoding
+#                          Default log directory now "~/vnmrsys/archive_logs"
+# 2004-11-26 - 0.10.1  rk, Added "-skip" option, prescanning for big data sets
+# 2004-11-27 - 0.10.3  rk, "-debug <level>" renamed from "-d" / "-D"
+#              0.10.4  rk, "-manual" option added
+#              0.10.5  rk, "-skip" complete, various cleanup jobs done
+# 2004-11-28 - 0.10.6  rk, "-up" / "-down" arguments / modes implemented
+# 2004-11-29 - 0.10.7  rk, Install script to retain active app-defaults config
+# 2004-11-30 - 0.11.8  rk, Date limit implementation started (NOT active yet!)
+# 2004-12-01 - 0.11.9  rk, Date limit implementation continues
+#              0.11.10 rk, Ditto; rearranged interactive input sequence
+#              0.11.11 rk, Date / age limit implementation complete, untested
+# 2004-12-03 - 0.11.13 rk, "cdrecord" args adjusted for Solaris (& Linux)
+# 2004-12-11 - 0.12.1  rk, "-test" argument / simulation mode implemented
+#              0.12.2  rk, Uses volset-size & volset-seqno ("up"/"down" modes)
+# 2004-12-12 - 0.12.3  rk, Move log file to $HOME after test tun
+#              0.12.4  rk, Bug fixes, added eject command to eject media
+#              0.12.10 rk, Target file vs. directory interpretation enhanced
+# 2004-12-14 - 0.12.11 rk, Allow relative paths in "app-defaults/makecd"
+# 2004-12-15 - 0.12.14 rk, Improved/simplified target/log directory checks
+# 2004-12-21 - 0.12.16 rk, Added link to log file, where appropriate
+# 2004-12-30 - 0.12.17 rk, Avoid extra double quotes in ISO9660 volname
+# 2005-01-10 - 0.12.18 rk, Avoid dumping log files to $HOME as default
+# 2005-01-16 - 0.12.19 rk, Fixed Linux-related compatibility issues
+# 2005-02-21 - 0.12.20 rk, Fixed problem with target if directory with target
+#			   name (minus ".iso") exists
+# 2005-04-05 - 0.12.21 rk, Minor changes in logging output
+# 2005-04-06 - 0.12.22 rk, Added disk space check for ISO9660 file systems
+# 2005-04-06 - 0.12.23 rk, Fixed bug with decoding of app-defaults file
+# 2005-04-06 - 0.12.24 rk, Cleaned up output in multi-volume looping
+# 2005-04-06 - 0.12.25 rk, Added "cksum" output for ISO9660 disk images
+# 2005-04-06 - 1.0.1   rk, First "officially released" version
+# 2005-04-07 - 1.0.2   rk, Changed default for NOBAK & FOLLOW_LINKS options.
+# 2008-03-21 - 1.0.3   rk, Adjusted "head" / "tail" calls for RHEL 5.1
+# 2009-07-15 - 1.0.4   rk, Changed for proper binary units
+
+version="1.0.4"
+revdate="2010-11-09_13:00"
+
+
+# +-----------------------+
+# | Compatibility section |
+# +-----------------------+
+echo=`which echo`
+pwd=`which pwd`
+tail=`which tail`
+sol=0
+if [ `uname` = SunOS ]; then
+  tail=/usr/xpg4/bin/tail
+  awk=nawk
+  sol=1
+elif [ `uname` = Linux ]; then
+  echo="$echo -e"
+  awk=awk
+elif [ `uname` = Darwin ]; then
+  time="$time -p"
+  awk=awk
+else
+  awk=awk
+fi
+
+
+# +----------------------------------------------+
+# | global / default settings, environment, etc. |
+# +----------------------------------------------+
+makcd=`basename $0`
+timestamp=`date '+%Y-%m-%d_%Hh%M'`
+if [ x$vnmrsystem = x ]; then
+  vnmrsystem=/vnmr
+fi
+if [ x$vnmruser = x ]; then
+  vnmruser=$HOME/vnmrsys
+fi
+host=`uname -n`
+VOLNAMEMAX=32           # maximum length of volume name
+ISOMARGIN=1.025         # factor by which the ISO9660 file system size may
+                        # exceed "du -sk"; with mostly big files the ISO9660
+                        # data size is likely to be SMALLER than the same data
+                        # in a UFS file system
+SAFETYMARGIN=1.01       # extra safety factor to avoid "CD-R overflow", i.e.,
+                        # we expect to fill a CD-R up to 99% only.
+
+
+# +=================================================================+
+# | CHECKDEVICE() - check whether target is valid device for "cdrw" |
+# +=================================================================+
+checkdevice() {
+  dev=""
+  abort=0
+
+  # +--------------------------------------------------------------------+
+  # | check for devices of type /dev/rdsk/c0t1d0s0 and /dev/dsk/c0t1d0s0 |
+  # +--------------------------------------------------------------------+
+  if [ `$echo $1 | grep -c '^/dev/rdsk/c[0-9]t[0-9]d[0-9]s[0-9]$'` -ne 0 -o \
+       `$echo $1 | grep -c '^/dev/dsk/c[0-9]t[0-9]d[0-9]s[0-9]$'` -ne 0 ]; then
+    # +--------------------------------------------------------+
+    # | verify that this is a symbolic link in "/dev" that     |
+    # | points to a character special device (in "/devices");  |
+    # | reject devices that are used for UFS type file systems |
+    # +--------------------------------------------------------+
+    if [ -h $1 -a \( -c $1 -o -b $1 \) ]; then
+      if [ $sol -eq 1 ]; then
+        if [ `grep -w ufs < /etc/vfstab | grep -c $1` -ne 0 ]; then
+          abort=1
+        else
+          dev=$1
+        fi
+      else
+        dev=$1
+      fi
+    fi
+
+  # +------------------------------------+
+  # | check for devices of type c0t1d0s0 |
+  # +------------------------------------+
+  elif [ `$echo $1 | grep -cw 'c[0-9]t[0-9]d[0-9]s[0-9]'` -ne 0 ]; then
+    if [ \( -h /dev/rdsk/$1 -o -h /dev/dsk/$1 \) -a \
+         \( -c /dev/rdsk/$1 -o -b /dev/dsk/$1 \) ]; then
+      if [ $sol -eq 1 ]; then
+        if [ `grep -w ufs < /etc/vfstab | grep -c /dev/rdsk/$1` -ne 0 ]; then
+          abort=1
+        else
+          dev=$1
+        fi
+      else
+        dev=$1
+      fi
+    fi
+
+  # +----------------------------------------------------------------+
+  # | check for devices of type /dev/rdsk/c0t1d0 and /dev/dsk/c0t1d0 |
+  # +----------------------------------------------------------------+
+  elif [ `$echo $1 | grep -c '^/dev/rdsk/c[0-9]t[0-9]d[0-9]$'` -ne 0 -o \
+         `$echo $1 | grep -c '^/dev/dsk/c[0-9]t[0-9]d[0-9]$'` -ne 0 ]; then
+    if [ -h ${1}s? -a \( -c ${1}s? -o -b ${1}s? \) ]; then
+      if [ $sol -eq 1 ]; then
+        if [ `grep -w ufs < /etc/vfstab | grep -c $1` -ne 0 ]; then
+          abort=1
+        else
+          dev=$1
+        fi
+      else
+        dev=$1
+      fi
+    fi
+
+  # +----------------------------------+
+  # | check for devices of type c0t1d0 |
+  # +----------------------------------+
+  elif [ `$echo $1 | grep -cw 'c[0-9]t[0-9]d[0-9]'` -ne 0 ]; then
+    if [ \( -h /dev/rdsk/${1}s? -o -h /dev/dsk/${1}s? \) -a \
+         \( -c /dev/rdsk/${1}s? -o -b /dev/dsk/${1}s? \) ]; then
+      if [ $sol -eq 1 ]; then
+        if [ `grep -w ufs < /etc/vfstab | grep -c /dev/rdsk/$1` -ne 0 ]; then
+          abort=1
+        else
+          dev=$1
+        fi
+      else
+        dev=$1
+      fi
+    fi
+
+  # +----------------------------------------------------------------+
+  # | check for devices of type /dev/rdsk/c0t1d0 and /dev/dsk/c0t1d0 |
+  # +----------------------------------------------------------------+
+  elif [ `$echo $1 | egrep -c '^/dev/cdrom[0-9]$|^/dev/cdrom$'` -ne 0 ]; then
+    if [ -h ${1}s? -a \( -c ${1}s? -o -b ${1}s? \) ]; then
+      if [ $sol -eq 1 ]; then
+        if [ `grep -w ufs < /etc/vfstab | grep -c $1` -ne 0 ]; then
+          abort=1
+        else
+          dev=$1
+        fi
+      else
+        dev=$1
+      fi
+    fi
+
+  # +---------------------------------------------+
+  # | check for device names recognized by volmgt |
+  # +---------------------------------------------+
+  elif [ `$echo $1 | egrep -c '^cdrom[0-9]$|^cdrom$'` -ne 0 ]; then
+    dev=$1
+
+  elif [ `uname | grep -ci linux` -eq 1 -a \
+         `$echo $1 | grep -ci 'atapi:0,0,[01]'` -ne 0 ]; then
+    dev=$1
+  fi
+  $echo $dev
+  return $abort
+}
+# +-------------------+
+# | END CHECKDEVICE() |
+# +-------------------+
+
+
+
+# +==============================================================+
+# | SETVOLNAME() - convert volume name template to volname value |
+# +==============================================================+
+# | arg1: volume name TEMPLATE                                   |
+# | arg2 (optional): directory, for "%DIR%" component            |
+# |                  (default: working directory)                |
+# | returns the volume name VALUE                                |
+# +--------------------------------------------------------------+
+setvolname() {
+
+  # +--------------------------------------------+
+  # | define available template component values |
+  # +--------------------------------------------+
+  date=`date '+%Y-%m-%d'`                               # %DATE%
+  year=`date '+%Y'`                                     # %Y%
+  month=`date '+%m'`                                    # %M%
+  fullmonth=`date '+%b'`                                # %MONTH%
+  day=`date '+%d'`                                      # %D%
+  weekday=`date '+%a'`                                  # %WEEKDAY%
+  time=`date '+%Hh%M'`                                  # %TIME%
+  host=`uname -n`                                       # %HOST%
+  username=`id | tr '()' '  ' | $awk '{print $2}'`      # %USER%
+  if [ $# -gt 1 ]; then                                 # %DIR%
+    dir=`basename $2`
+    if [ x$dir = "x." ]; then
+      dir=`dirname $2`
+      dir=`basename $dir`
+    fi
+  else
+    dir=`$pwd`
+    dir=`basename $dir`
+  fi
+
+  # +-------------------------------------------+
+  # | argument #1 (mandatory): volname template |
+  # +-------------------------------------------+
+  tmpl=$1
+  maxBlen=$VOLNAMEMAX
+
+  # +---------------------------------------------+
+  # | identify trailing "[_-]%DATE%" and "%DATE%" |
+  # +---------------------------------------------+
+  tail7=`$echo $tmpl | $awk '{print substr($1,length($1)-6,7)}'`
+  tail6=`$echo $tmpl | $awk '{print substr($1,length($1)-5,6)}'`
+  if [ `$echo $tail7 | grep -ic '\-%DATE%'` -eq 1 ]; then
+    tail="-$date"
+    tmpl=`$echo $tmpl | $awk '{print substr($1,1,length($1)-7)}'`
+    maxBlen=`expr $maxBlen - 11`
+  elif [ `$echo $tail7 | grep -ic '_%DATE%'` -eq 1 ]; then
+    tail="_$date"
+    tmpl=`$echo $tmpl | $awk '{print substr($1,1,length($1)-7)}'`
+    maxBlen=`expr $maxBlen - 11`
+  elif [ `$echo $tail6 | grep -ic '%DATE%'` -eq 1 ]; then
+    tail="$date"
+    tmpl=`$echo $tmpl | $awk '{print substr($1,1,length($1)-6)}'`
+    maxBlen=`expr $maxBlen - 10`
+  else
+    tail=""
+  fi
+
+  # +----------------------------------+
+  # | substitute template placeholders |
+  # +----------------------------------+
+  value=`$echo $tmpl | sed "s/%[Hh][Oo][Ss][Tt]%/$host/g
+s/%[Uu][Ss][Ee][Rr]%/$username/g
+s/%[Dd][Ii][Rr]%/$dir/g
+s/%[Dd][Aa][Tt][Ee]%/$date/g
+s/%[Yy]%/$year/g
+s/%[Mm]%/$month/g
+s/%[Mm][Oo][Nn][Tt][Hh]%/$fullmonth/g
+s/%[Dd]%/$day/g
+s/%[Ww][Ee][Ee][Kk][Dd][Aa][Yy]%/$weekday/g
+s/%[Tt][Ii][Mm][Ee]%/$time/g
+s/ /_/g
+s/_[_]*/_/g
+s/-[-]*/-/g
+s/_-/-/g
+s/-_/-/g"`
+  # +-------------------------------------------+
+  # | also replace blanks by underscores,       |
+  # | eliminate successive underscores,         |
+  # | replace successions of '-' and '_' by '-' |
+  # +-------------------------------------------+
+
+  # +--------------------------------------------------------+
+  # | eliminate trailing '_' and '-' if tail starts with '-' |
+  # +--------------------------------------------------------+
+  if [ `$echo $tail | grep -c '^[-_]'` -eq 1 ]; then
+    value=`$echo $value | sed 's/[-_]$//'`
+  fi
+
+  # +-----------------------+
+  # | truncate value (body) |
+  # +-----------------------+
+  value=`$echo $value | cut -c1-$maxBlen`
+
+  # +------------------------------+
+  # | add tail, return final value |
+  # +------------------------------+
+  value=${value}${tail}
+  $echo $value
+}
+# +------------------+
+# | END SETVOLNAME() |
+# +------------------+
+
+
+
+# +=============================================================+
+# | DECODE_DATE() - interpret specified date (date limit) entry |
+# +=============================================================+
+# | arg1: specified date limit                                  |
+# | returns the date in format suitable for "find" or "touch"   |
+# +-------------------------------------------------------------+
+decode_date() {
+  curyear=`date '+%Y'`
+  curmonth=`date '+%m'`
+  curday=`date '+%d'`
+  show=0
+  if [ x$1 = x-show ]; then
+    show=1
+    shift
+  fi
+
+  # +------------------------------------------+
+  # | "none", "no" or "off" mean no date limit |
+  # +------------------------------------------+
+  if [ `$echo x$1 | grep -ic '^xnone$'` -eq 1 ]; then
+    if [ $show -eq 1 ]; then
+      $echo "no age / date limit"
+    else
+      $echo none
+    fi
+    return
+  elif [ `$echo x$1 | egrep -ic '^xno$|^off$'` -eq 1 ]; then
+    if [ $show -eq 1 ]; then
+      $echo "no age / date limit"
+    else
+      $echo none
+    fi
+    return
+
+  # +--------------------------------------------------------------+
+  # | date in relative format, i.e., [+-]N, [+-]Nd, [+-]Nm, [+-]Ny |
+  # +--------------------------------------------------------------+
+  elif [ `$echo x$1 | grep -c '^x[+-][0-9]*[0-9]$'` -eq 1 ]; then
+    if [ $show -eq 1 ]; then
+      days=`$echo $1 | $awk '{print substr($1,2,length($1)-1)}'`
+      if [ $days -gt 1 ]; then
+        lim="$days days"
+      else
+        lim="day"
+      fi
+      if [ `$echo $1 | grep -c '+'` -gt 0 ]; then
+        $echo "selecting data created/modified more than $lim ago"
+      else
+        $echo "selecting data created/modified over the past $lim"
+      fi
+    else
+      $echo $1
+    fi
+    return
+  elif [ `$echo x$1 | grep -ic '^x[+-][0-9]*[0-9]d$'` -eq 1 ]; then
+    if [ $show -eq 1 ]; then
+      days=`$echo $1 | $awk '{print substr($1,2,length($1)-2)}'`
+      if [ $days -gt 1 ]; then
+        lim="$days days"
+      else
+        lim="day"
+      fi
+      if [ `$echo $1 | grep -c '+'` -gt 0 ]; then
+        $echo "data created/modified more than $lim ago"
+      else
+        $echo "data created/modified over the past $lim"
+      fi
+    else
+      $echo $1 | $awk '{print substr($1,1,length($1)-1)}'
+    fi
+    return
+  elif [ `$echo x$1 | grep -ic '^x[+-][0-9]*[0-9]m$'` -eq 1 ]; then
+    months=`$echo $1 | $awk '{print substr($1,2,length($1)-2)}'`
+    sign=`$echo $1 | cut -c1,1`
+    days=`$echo $months | $awk '{printf("%1.0f\n",$1*365.25/12)}'`
+    if [ $show -eq 1 ]; then
+      if [ $months -gt 1 ]; then
+        lim="$months months"
+      else
+        lim="month"
+      fi
+      if [ x$sign = x+ ]; then
+        $echo "data created/modified more than $lim ($days days) ago"
+      else
+        $echo "data created/modified over the past $lim ($days days)"
+      fi
+    else
+      $echo ${sign}${days}
+    fi
+    return
+  elif [ `$echo x$1 | grep -ic '^x[+-][0-9]*[0-9]y$'` -eq 1 ]; then
+    years=`$echo $1 | $awk '{print substr($1,2,length($1)-2)}'`
+    sign=`$echo $1 | cut -c1,1`
+    days=`$echo $years | $awk '{printf("%1.0f\n",$1*365.25)}'`
+    if [ $show -eq 1 ]; then
+      if [ $years -gt 1 ]; then
+        lim="$years years"
+      else
+        lim="year"
+      fi
+      if [ x$sign = x+ ]; then
+        $echo "data created/modified more than $lim ($days days) ago"
+      else
+        $echo "data created/modified over the past $lim ($days days)"
+      fi
+    else
+      $echo ${sign}${days}
+    fi
+    return
+
+  $ +-----------------------------------------------+
+  # | date in absolute format, i.e., <yy<yy<mm>>>dd |
+  # |    OR <<<yy>yy[-/.]><m>m[-/.]><d>d            |
+  $ +-----------------------------------------------+
+  elif [ `$echo x$1 | egrep -c '^x[0-9][-/\.0-9]*[0-9]$|^x[0-9]$'` -eq 1 ]; then
+    indate=`$echo $1 | sed 's/\//-/g
+s/\./-/g
+s/-1-/-01-/
+s/-2-/-02-/
+s/-3-/-03-/
+s/-4-/-04-/
+s/-5-/-05-/
+s/-6-/-06-/
+s/-7-/-07-/
+s/-8-/-08-/
+s/-9-/-09-/
+s/-1$/-01/
+s/-2$/-02/
+s/-3$/-03/
+s/-4$/-04/
+s/-5$/-05/
+s/-6$/-06/
+s/-7$/-07/
+s/-8$/-08/
+s/-9$/-09/
+s/-//g'`
+    inlen=`$echo $indate | $awk '{print length($1)}'`
+    if [ $inlen -gt 2 ]; then
+      inday=`$echo $indate | $awk '{print substr($1,length($1)-1,2)}'`
+    else
+      inday=`$echo $1 | $awk '{printf("%02d\n",$1)}'`
+      inmonth=$curmonth
+      inyear=$curyear
+      if [ $inday -gt $curday ]; then
+        inmonth=`expr $inmonth - 1 | $awk '{printf("%02d\n",$1)}'`
+        if [ $inmonth -eq 0 ]; then
+          inmonth=12
+          inyear=`expr $inyear - 1`
+        fi
+      fi
+    fi
+    if [ $inday -gt 31 ]; then
+      $echo invalid
+      return
+    fi
+    if [ $inlen -eq 3 ]; then
+      inmonth=`$echo $indate | cut -c1,1 | $awk '{printf("%02d\n",$1)}'`
+      inyear=$curyear
+      if [ $inmonth$inday -gt $curmonth$curyear ]; then
+        inyear=`expr $inyear - 1`
+      fi
+    elif [ $inlen -eq 4 ]; then
+      inmonth=`$echo $indate | cut -c1,2`
+      inyear=$curyear
+      if [ $inmonth$inday -gt $curmonth$curday ]; then
+        inyear=`expr $inyear - 1`
+      fi
+    elif [ $inlen -gt 4 ]; then
+      inmonth=`$echo $indate | $awk '{print substr($1,length($1)-3,2)}'`
+    fi
+    if [ $inmonth -gt 12 ]; then
+      $echo invalid
+      return
+    fi
+    if [ `$echo $inmonth | egrep -c '^04$|^06$|^09$|^11$'` -eq 1 -a \
+         $inday -gt 30 ]; then
+      inday=30
+    elif [ $inmonth -eq 2 -a $inday -gt 29 ]; then
+      inday=29
+    fi
+    if [ $inlen -eq 5 ]; then
+      inyear=`$echo $indate | cut -c1,1 | $awk '{printf("%02d\n",$1+2000)}'`
+      if [ $inyear -gt $curyear ]; then
+        $echo invalid
+        return
+      fi
+    elif [ $inlen -eq 6 ]; then
+      inyear=`$echo $indate | cut -c1,2`
+      if [ $inyear -gt 68 ]; then
+        inyear=`expr $inyear + 1900`
+      elif [ $inyear -lt 39 ]; then
+        inyear=`expr $inyear + 2000`
+      else
+        $echo "invalid"
+        return
+      fi
+    elif [ $inlen -gt 6 ]; then
+      inyear=`$echo $indate | $awk '{print substr($1,1,length($1)-4)}'`
+      if [ $inyear -gt $curyear -o $inyear -lt 1969 ]; then
+        $echo invalid
+        return
+      fi
+    fi
+    if [ `expr $inyear % 4` -ne 0 -a $inmonth -eq 2 -a $inday -eq 29 ]; then
+      inday=28
+    fi
+    if [ $inyear$inmonth$inday -gt $curyear$curmonth$curday ]; then
+      $echo invalid
+      return
+    else
+      if [ $show -eq 1 ]; then
+        if [ $mode = up -o $mode = old ]; then
+          deadline="$inyear-$inmonth-$inday 23:59"
+          $echo "data created / last modified before $deadline"
+        else
+          deadline="$inyear-$inmonth-$inday 00:00"
+          $echo "data created / last modified after $deadline"
+        fi
+      else
+        $echo $inyear$inmonth$inday
+      fi
+      return
+    fi
+  else
+    $echo invalid
+    return
+  fi
+}
+# +-------------------+
+# | END DECODE_DATE() |
+# +-------------------+
+
+
+
+# +===================================================+
+# | PRINTHELP() - print help information and and exit |
+# +===================================================+
+printhelp() {
+  if [ -f $vnmruser/manual/$makcd ]; then
+    manfile='$HOME/vnmrsys/manual/'$makcd
+  elif [ -f /vnmr/manual/$makcd ]; then
+    manfile=/vnmr/manual/$makcd
+  else
+    manfile=manual/$makcd
+  fi
+  cat << %
+
+Usage:  $makcd <-age ###|-date<limit> yyyy-mm-dd> <-confirm> \\
+               <-debug <level>> <+followlinks|-followlinks> <-interactive> \\
+               <-log log_file> <-number #> <-old|-up|-recent|-down> \\
+               <-size #_MiB> <-sourcedir source_dir> <-skip> <-speed #> \\
+               <-test> <-volname volume_name> <target>
+        $makcd <-age ###|-date<limit> yyyy-mm-dd> <-debug <level>> \\
+               <+followlinks|-followlinks> <-log log_file> <-number #> \\
+               <-old|-up|-recent|-down> <-print|-query> <-size #_MiB> \\
+               <-sourcedir source_dir> <-skip> <-speed #> <-test> \\
+               <-volname volume_name> <target>
+        $makcd -version
+        $makcd -help
+        $makcd -manual
+
+For more information see "man('$makcd')" from the VnmrJ / VNMR command line,
+or use the command
+        $makcd -man
+in a shell window.
+
+%
+  exit
+}
+# +-----------------+
+# | END PRINTHELP() |
+# +-----------------+
+
+
+
+# +===================================================+
+# | EXPLAINVOLNAME() - explain volume name / template |
+# +===================================================+
+explainvolname() {
+  cat << %
+  +---------------------------------------------------------------------------
+  | EXPLANATION on the ISO9660 volume name and volume name templates
+  +---------------------------------------------------------------------------
+  |  The ISO9660 volume name is a string (32 characters or less) that is used
+  |  as secondary mount point with the Solaris "volmgt", or used as disk name
+  |  in MacOS X / MS Windows. In "$makcd", the volume name is defined through a
+  |  "template string", such as the default template
+  |             %HOST%-%USER%_%DIR%_%DATE%
+  |  which will then be translated to something like
+  |             ui600-vnmr1_data_2004-11-13
+  |  depending on the local name settings and the archival date; however, you
+  |  can of course also specify a fixed volume name, or a combination of a
+  |  fixed string and template elements, e.g.:
+  |             ubiquitin protein data %DATE%
+  |  which will in this case be translated to (e.g.)
+  |             ubiquitin_protein_data_2004-11-13
+  |  It is recommended either to enter unique volume names, or to use a
+  |  variable element (such as the date) in the volume name, in order to avoid
+  |  creating multiple archival media with identical volume names (which may
+  |  cause confusion with later data recovery from archival media). "$makcd"
+  |  handles the following template elements:
+  |             %HOST%       -> system host name ("uname -n")
+  |             %USER%       -> login of the user running "makecd"
+  |             %DIR%        -> basename of the source directory
+  |             %DATE%       -> (archiving) date in ISO format (yyyy-mm-dd)
+  |             %Y%          -> 4-digit year (archiving date)
+  |             %M%          -> 2-digit month (01 .. 12)
+  |             %MONTH%      -> month (Jan .. Dec)
+  |             %D%          -> 2-digit day (01 .. 31)
+  |             %WEEKDAY%    -> day of the week (Mon .. Sun)
+  |             %TIME%       -> archiving time (HHhMM, e.g., 15h25)
+  |  IMPORTANT NOTES:
+  |   - The total lengthy of the volume name cannot exceed 32 characters. If
+  |     "-%DATE%", "_%DATE%" or just "%DATE%" is at the end of the template,
+  |     the preceding part may be truncated, in all other cases the overall
+  |     result is truncated, in order to make the result fit into 32 chars.
+  |   - Although from a Windows and MacOS point-of-view blanks in the volume
+  |     name are OK, in a UNIX world this is doable, but leads to unnecessary
+  |     complications - it's better to avoid blanks; "makecd" will translate
+  |     blanks in the volume name to "_" (underscore) characters.
+  |   - From a point-of-view of Windows compatibility is may also be advisable
+  |     NOT to use colons (":") and dots (".") in the volume name - but
+  |     "makecd" will leave these untouched.
+  +---------------------------------------------------------------------------
+%
+}
+# +----------------------+
+# | END EXPLAINVOLNAME() |
+# +----------------------+
+
+
+
+# +=======================================================+
+# | EXPLAINDATELIMIT() - explain date / age limit formats |
+# +=======================================================+
+explaindatelimit() {
+  cat << %
+  +---------------------------------------------------------------------------
+  | EXPLANATION on the allowed date / age limit formats
+  +---------------------------------------------------------------------------
+  | By default, each of the "$makcd" modes ("down", "recent", "up", "old")
+  | looks at all the subfiles / subdirectories in the specified source
+  | directory. You may, however, specify an "age limit" (last or earliest
+  | modification date) to the archiving file selection. There are two types
+  | of date limits, relative and absolute. The RELATIVE limits can be
+  | specified as upper or as lower (age) limit:
+  |  - select files of a specified MINIMUM AGE ("files older than ... ").
+  |    This is done by specifying an integer that MUST be preceded by a "+",
+  |    and the integer can be followed by an optional unit character:
+  |          +30     (files modified MORE THAN 3e days ago)
+  |          +30d    (ditto)
+  |          +8m     (files modified MORE THAN 8 months ago)
+  |          +2y     (files modified MORE THAN 2 years ago)
+  |    A year is taken as 365.25 days, a month is 365.25/12 days, i.e., "+1m"
+  |    ("more than a month ago") may not start exactly on the day you expect!
+  |  - select files of a certain MAXIMUM AGE ("files up to the age of ... ").
+  |    This is done by specifying an integer that MUST be preceded by a "-",
+  |    and the integer can again be followed by an optional unit character:
+  |          -30     (files modified UP TO 30 days ago)
+  |          -30d    (ditto)
+  |          -8m     (files modified UP TO 8 months ago)
+  |          -2y     (files modified UP TO 2 years ago)
+  |    See above for the definition of the "m" and "y" units.
+  | Alternatively, you may specify an ABSOLUTE date limit: the general format
+  | for this is "[0-9][-/.0-9][0-9]", i.e., the date MUST start and end with
+  | a numeric character. The date MUST be specified in one of the following
+  | formats, which are all derived from the ISO 8601 standard (yyyy-mm-dd):
+  | one option is
+  |          <<<yy>yy>mm>dd
+  | Examples (assuming the current date os 2004-11-13):
+  |          18              same as 2004-10-18
+  |          1201            same as 2003-12-01
+  |          991201          same as 1999-12-01
+  |          20011201        same as 2001-12-01
+  | month and day MUST be given in two-digit format, the year may be specified
+  | with or without century digits. If the year or the month and year are not
+  | given, the current (or last) month and/or year are assumed. Alternatively,
+  | the format
+  |          <<<yy>yy-><m>m-><d>d
+  | may be used. In this case, one-digit month or day entries are allowed, and
+  | in lieu of the "-", also "/" or "." may be used as separators. Examples
+  | (again assuming the current date is 2004-11-13):
+  |          2001/12/01      same as 2001-12-01
+  |          2001.12.01      same as 2001-12-01
+  |          99-2-3          same as 1999-02-03
+  |          12-3            same as 2003-12-03
+  |          2/3             same as 2004-02-03
+  |          23              same as 2004-10-23
+  |          3               same as 2004-11-03
+  | The functionality of the RELATIVE limits is obvious; the functionality of
+  | ABSOLUTE date limits depends on the active mode:
+  |  - with the "up" and "old" modes, an absolute date limit means "data
+  |    created UP TO (OR ON) the specified date";
+  |  - with the "recent" and "down" modes, an absolute date limit means "data
+  |    created AFTER OR ON the specified date".
+  +---------------------------------------------------------------------------
+%
+}
+# +------------------------+
+# | END EXPLAINDATELIMIT() |
+# +------------------------+
+
+
+
+# +====================================================+
+# | EXPLAINFOLLOWLINKS() - explain followlinks options |
+# +====================================================+
+explainfollowlinks() {
+  cat << %
+  +---------------------------------------------------------------------------
+  | EXPLANATION on the +followlinks / -followlinks Options:
+  +---------------------------------------------------------------------------
+  | "mkisofs" (used by "$makcd") has two options for symbolic links:
+  |   - If symbolic links are NOT followed ("-f<ollowlinks>" option with
+  |     "$makcd", default behavior with "mkisofs"), symbolic links within the
+  |     source directory are archived "as such", rather than the file they
+  |     are pointing to. The result will ONLY make sense if the link target
+  |     is archived TOGETHER with the symbolic link, i.e., if it is also in
+  |     (the archived part of) the source directory.
+  |   - If symbolic links ARE FOLLOWED ("-f" option with "mkisofs",
+  |     "+f<ollowlinks>" option with "$makcd"), "mkisofs" archives the link
+  |     TARGET rather than the symbolic link. This makes sense and can be
+  |     used if data OUTSIDE the source directory are to be archived without
+  |     having to copy such data into the archive. In such a case, you simply
+  |     create a symbolic link in the source directory, e.g.:
+  |          ln -s /space/vnmr1/mydata ~/vnmrsys/data
+  |     (assuming you are archiving data from "~/vnmrsys/data").
+  +---------------------------------------------------------------------------
+%
+}
+# +--------------------------+
+# | END EXPLAINFOLLOWLINKS() |
+# +--------------------------+
+
+
+
+# +=======================================+
+# | EXPLAINSPEED() - explain speed option |
+# +=======================================+
+explainspeed() {
+  cat << %
+  +---------------------------------------------------------------------------
+  | EXPLANATION on the CD-R Speed Options:
+  +---------------------------------------------------------------------------
+  | "cdrw" (used by $makcd for direct writing to archival media) may control
+  | the CD-R/RW drive speed. There are several factors that may make it
+  | advisable or necessary NOT to use the drive's default (i.e., maximum)
+  | speed when writing archival media:
+  |   - the actual media (especially low-cost brands) may not be compatible
+  |     with a drive's default (= top) writing speed (make sure you check
+  |     the product description!)
+  |   - CD-R disks MUST be written without interruption (single session),
+  |     and even though some CD-R drives have substantial internal buffers,
+  |     this essentially still requires a continuous, steady data flow to
+  |     the CD-R drive, possibly precluding operations with large data I/O
+  |     requirements while burning. Lower speeds are less demanding on the
+  |     system. Remember: "$makcd" runs "cdrw" IN CONNECTION WITH "mkisofs",
+  |     and "mkisofs" IS a command doing lots if data I/O!
+  +---------------------------------------------------------------------------
+%
+}
+# +--------------------+
+# | END EXPLAINSPEED() |
+# +--------------------+
+
+
+
+# +-----------------------------+
+# | check for required commands |
+# +-----------------------------+
+missingCMD=0
+for c in mkisofs; do
+  if [ `which $c 2>&1 | grep -c "no $c in "` -gt 0 ]; then
+    $echo "$makcd:  Required command \"$c\" not available or not in command path;"
+    missingCMD=`expr $missingCMD + 1`
+  fi
+  if [ $missingCMD -gt 0 ]; then
+    $echo "   aborting."
+    $echo
+    exit
+  fi
+done
+
+
+# +-----------------------------------------------------+
+# | check for presence of "cdrw" or "cdrecord" commands |
+# | if those are missing, we can't burn CDs, but we can |
+# | still generate ISO9660 disk images using "mkisofs"  |
+# +-----------------------------------------------------+
+cdrw=1
+if [ `which cdrw 2>&1 | grep -c "no cdrw in "` -gt 0 ]; then
+  if [ `which cdrecord 2>&1 | grep -c "no cdrecord in "` -gt 0 ]; then
+    cdrw=0
+    cdcmd=""
+  else
+    cdcmd=cdrecord
+  fi
+else
+  cdcmd=cdrw
+fi
+
+
+# +---------------------------------------------------------+
+# | check version of mkisofs: Solaris 8 version does not    |
+# | permit using file-based exclude-lists, i.e., there are  |
+# | limitations in the number of files that can be excluded |
+# | from archiving. "makecd" may therefore abort if the     |
+# | archive media capacity is not sufficient                |
+# +---------------------------------------------------------+
+mkisofs=new
+if [ `uname` = SunOS ]; then
+  mrev=`mkisofs -version 2>&1 | head -n 1`
+  if [ `$echo $mrev | egrep -v 'unrecognized' | grep -c '^mkisofs [0-9]'` \
+        -ne 1 ]; then
+    mkisofs=old
+  fi
+fi
+
+
+
+# +============================================================+
+# | CHECK FOR COMMAND-SPECIFIC DEFINITION FILE IN APP-DEFAULTS |
+# +============================================================+
+me=`id | tr '()' '  ' | $awk '{print $2}'`
+tmpfile=/tmp/${makcd}_$me.$$
+rm -f $tmpfile
+
+
+# +-------------------------------------------------------------+
+# | First parse global file /vnmr/app-defaults/makecd, if found |
+# +-------------------------------------------------------------+
+appdefG=$vnmrsystem/app-defaults/$makcd
+if [ -s $appdefG ]; then
+  expand $appdefG | grep '^[ ]*[A-Z]' | tr '"' ' ' | sed 's/ [ ]*/ /g
+s/[ ]*=[ ]*/ /
+s/[ ]*#.*$//' | $awk '{if (NF >= 2) print}' > $tmpfile
+fi
+
+# +-------------------------------------------------------+
+# | Then parse local file ~/app-defaults/makecd, if found |
+# +-------------------------------------------------------+
+appdefL=$HOME/app-defaults/$makcd
+if [ -s $appdefL ]; then
+  expand $appdefL | grep '^[ ]*[A-Z]' | tr '"' ' ' | sed 's/ [ ]*/ /g
+s/[ ]*=[ ]*/ /
+s/[ ]*#.*$//' | $awk '{if (NF >= 2) print}' >> $tmpfile
+fi
+if [ ! -s $tmpfile ]; then
+  rm -f $tmpfile
+fi
+
+# +-------------------------------------+
+# | Now decode app-defaults definitions |
+# | both files are parsed (if present); |
+# | local definitions override global   |
+# |    ones on a case-by-case basis.    |
+# +-------------------------------------+
+if [ -s $tmpfile ]; then
+  CD_SOURCEDIR=`   $awk < $tmpfile '{if ($1=="SOURCEDIR")   print $NF}' | \
+	           $tail -n 1`
+  CD_ARCHIVEMODE=` $awk < $tmpfile '{if ($1=="ARCHIVEMODE") print $NF}' | \
+	           $tail -n 1`
+  CD_COPIES=`      $awk < $tmpfile '{if ($1=="COPIES")      print $NF}' | \
+	           $tail -n 1`
+  CD_CONFIRM=`     $awk < $tmpfile '{if ($1=="CONFIRM")     print $NF}' | \
+	           $tail -n 1`
+  CD_DATELIMIT=`   $awk < $tmpfile '{if ($1=="DATELIMIT")   print $NF}' | \
+	           $tail -n 1`
+  CD_DEBUGLEVEL=`  $awk < $tmpfile '{if ($1=="DEBUGLEVEL")  print $NF}' | \
+	           $tail -n 1`
+  CD_FOLLOWLINKS=` $awk < $tmpfile '{if ($1=="FOLLOWLINKS") print $NF}' | \
+	           $tail -n 1`
+  CD_NOBAK=`       $awk < $tmpfile '{if ($1=="NOBAK")       print $NF}' | \
+	           $tail -n 1`
+  CD_INTERACTIVE=` $awk < $tmpfile '{if ($1=="INTERACTIVE") print $NF}' | \
+	           $tail -n 1`
+  CD_LOG=`         $awk < $tmpfile '{if ($1=="LOG")         print $NF}' | \
+	           $tail -n 1`
+  CD_MEDIASIZE=`   $awk < $tmpfile '{if ($1=="MEDIASIZE")   print $NF}' | \
+	           $tail -n 1`
+  CD_SKIP=`        $awk < $tmpfile '{if ($1=="SKIP")        print $NF}' | \
+	           $tail -n 1`
+  CD_SPEED=`       $awk < $tmpfile '{if ($1=="SPEED")       print $NF}' | \
+	           $tail -n 1`
+  CD_TARGET=`      $awk < $tmpfile '{if ($1=="TARGET")      print $NF}' | \
+	           $tail -n 1`
+  CD_VOLNAME="`    $awk < $tmpfile '{if ($1=="VOLNAME")     print}' | \
+	           $tail -n 1 | sed 's/VOLNAME[ ]*//' | sed 's/ [ ]*$//'`"
+fi
+rm -f $tmpfile
+
+
+# +------------------------------------------------------+
+# | set default date limit from app-defaults, if defined |
+# |   may be altered by command line argument            |
+# +------------------------------------------------------+
+if [ x$CD_DATELIMIT != x ]; then
+  inlimit="$CD_DATELIMIT"
+  datelimit=`decode_date $CD_DATELIMIT`
+else
+  inlimit=none
+  datelimit=none
+fi
+if [ x$datelimit = xinvalid ]; then
+  cat << %
+$makcd:  the absolute or relative date limit specified in
+         "app-defaults/$makcd" (DATELIMIT entry) is invalid!
+
+%
+  if [ -f $HOME/app-defaults/$makcd ]; then
+    if [ `grep -c '^[ ]*DATELIMIT' < $HOME/app-defaults/$makcd` -gt 0 ]; then
+      cat << %
+         Correct the bad definition in "$HOME/app-defaults/$makcd",
+         then try again!
+
+   aborting.
+
+%
+      exit
+    fi
+  fi
+  cat << %
+         Correct the bad definition in "/vnmr/app-defaults/$makcd",
+         then try again!
+
+   aborting.
+
+%
+  exit
+fi
+timestampfile=/tmp/$makcd.timestamp.$$
+
+
+# +-------------------------------------------------+
+# | default debug level: 0=off, 1=simple, 2=verbose |
+# |   may be altered by command line argument       |
+# +-------------------------------------------------+
+if [ x$CD_DEBUGLEVEL = x ]; then
+  debug=0
+else
+  debug=$CD_DEBUGLEVEL
+fi
+
+
+# +------------------------------------------------------+
+# | confirm mode - asks for confirmation before starting |
+# | actual archiving, prompts user to insert media (with |
+# | direct archiving to removable media only, enforced   |
+# | if multiple copies requested).                       |
+# +------------------------------------------------------+
+if [ x$CD_CONFIRM = x ]; then
+  confirm=0
+else
+  if [ `$echo $CD_CONFIRM | egrep -ic 'Y|TRUE'` -gt 0 ]; then
+    confirm=1
+  else
+    confirm=0
+  fi
+fi
+
+
+# +--------------------------------------------------------------+
+# | NOBAK option - configurable via "app-defaults/makecd" ONLY   |
+# |    controls the use of "-no-bak" option (new "mkisofs" only) |
+# | 0 means that files named "*~", "*.bk", or "*#*" ARE archived |
+# | 1 means that these files are EXCLUDED from the archive.      |
+# +--------------------------------------------------------------+
+if [ x$CD_NOBAK = x ]; then
+  nobak=0
+else
+  if [ `$echo $CD_NOBAK | egrep -ic 'N|FALSE'` -gt 0 ]; then
+    nobak=0
+  else
+    nobak=1
+  fi
+fi
+
+
+# +---------------------------------------------------+
+# | interactive mode - guide user through the options |
+# |    also enforces "confirm" mode,                  |
+# +---------------------------------------------------+
+if [ x$CD_INTERACTIVE = x ]; then
+  interactive=0
+else
+  if [ `$echo $CD_INTERACTIVE | egrep -ic 'Y|TRUE'` -gt 0 ]; then
+    interactive=1
+    confirm=1
+  else
+    interactive=0
+  fi
+fi
+
+
+# +---------------------------------------------------------------------------+
+# | set default archiving mode (old vs. recent) from app-defaults, if defined |
+# |   may be altered by command line argument                                 |
+# +---------------------------------------------------------------------------+
+if [ x$CD_ARCHIVEMODE = x ]; then
+  mode=recent
+else
+  mode=$CD_ARCHIVEMODE
+fi
+
+
+# +-----------------------------------------------------+
+# | set "skip" flag, controlling whether subdirectories |
+# |   that exceed the media size should be skipped; may |
+# |   be altered by command line argument "-skip".      |
+# +-----------------------------------------------------+
+if [ `$echo $CD_SKIP | egrep -ic 'Y|TRUE'` -gt 0 ]; then
+  skip=1
+else
+  skip=0
+fi
+
+
+# +---------------------------------------------+
+# | CD-R/RW speed from app-defaults, if defined |
+# |   may be altered by command line argument   |
+# +---------------------------------------------+
+if [ x$CD_SPEED = x ]; then
+  speed=0
+else
+  speed=$CD_SPEED
+fi
+
+
+# +------------------------------------------------------------+
+# | set directory to be archived from app-defaults, if defined |
+# +------------------------------------------------------------+
+homestr=`$echo $HOME | sed 's/\//\\\\\//g'`
+if [ x$CD_SOURCEDIR = x ]; then
+  if [ -d $vnmruser/data/studies ]; then
+    sourcedir=$vnmruser/data/studies
+  elif [ -d $vnmruser/data ]; then
+    sourcedir=$vnmruser/data
+  elif [ -d $HOME/data ]; then
+    sourcedir=$HOME/data
+  fi
+else
+  sourcedir=`$echo $CD_SOURCEDIR | sed 's/^~\//\$HOME\//
+s/^\$HOME/'$homestr'/'`
+  if [ `$echo $sourcedir | grep -c '^/'` -eq 0 ]; then
+    sourcedir=$HOME/$sourcedir
+  fi
+fi
+
+
+# +-------------------------------------------------------------+
+# | set number of archival copies from app-defaults, if defined |
+# +-------------------------------------------------------------+
+if [ x$CD_COPIES = x ]; then
+  number=1
+else
+  number=$CD_COPIES
+fi
+if [ $number -gt 1 ]; then
+  confirm=1
+fi
+
+
+# +----------------------------------------------+
+# | set media size from app-defaults, if defined |
+# +----------------------------------------------+
+if [ x$CD_MEDIASIZE = x ]; then
+  maxsizeMiB=650
+else
+  maxsizeMiB=$CD_MEDIASIZE
+fi
+
+
+# +-------------------------------------------------------+
+# | set follow_links option from app-defaults, if defined |
+# |   may be altered by command line argument             |
+# +-------------------------------------------------------+
+if [ x$CD_FOLLOWLINKS != x ]; then
+  if [ `$echo $CD_FOLLOWLINKS | egrep -ic 'Y|TRUE'` -gt 0 ]; then
+    follow_links="-f"
+  else
+    follow_links=""
+  fi
+else
+# follow_links="-f"
+  follow_links=""
+fi
+
+
+# +--------------------------------------------------+
+# | set logging target from app-defaults, if defined |
+# |   check to see if logging directory exists.      |
+# |   may be altered by command line argument        |
+# +--------------------------------------------------+
+loglink=0
+if [ x$CD_LOG != x ]; then
+  log=`$echo $CD_LOG | sed 's/^~\//$HOME\//
+s/^\$HOME/'$homestr'/'`
+  if [ `$echo $log | grep -c '^/'` -eq 0 ]; then
+    log=$HOME/$log
+  fi
+  if [ -d $log ]; then
+    log=${log}/cd_log_$timestamp
+    loglink=1
+  fi
+else
+  log=$vnmruser/archive_logs/cd_log_$timestamp
+  loglink=1
+fi
+if [ `dirname $log` = $HOME ]; then
+  loglink=0
+fi
+
+
+# +--------------------------------------------------+
+# | set default target from app-defaults, if defined |
+# |   may be altered by command line argument        |
+# +--------------------------------------------------+
+if [ x$CD_TARGET != x ]; then
+  target=`$echo $CD_TARGET | sed 's/^~\//$HOME\//
+s/^\$HOME/'$homestr'/'`
+  if [ `$echo $target | grep -c '^/'` -eq 0 ]; then
+    target=$HOME/$target
+  fi
+  if [ -d $target ]; then
+    targetdir=$target
+    target=$targetdir/cd_$timestamp
+  else
+    tail=`$echo $target | $awk '{print substr($1,length($1)-3,4)}'`
+    if [ $tail = ".iso" ]; then
+      target=`$echo $target | $awk '{print substr($1,1,length($1)-4)}'`
+    fi
+    targetdir=`dirname $target`
+  fi
+else
+  target=$vnmruser/cd_$timestamp
+  targetdir=`dirname $target`
+fi
+
+
+# +----------------------------------------------------------------+
+# | set default volume name template from app-defaults, if defined |
+# |   may be altered by command line argument                      |
+# +----------------------------------------------------------------+
+if [ "x$CD_VOLNAME" != x ]; then
+  voltmpl=$CD_VOLNAME
+else
+  voltmpl="%HOST%-%USER%_%DIR%_%DATE%"
+fi
+
+
+# +-------------------------------+
+# | set volume name from template |
+# +-------------------------------+
+volname=`setvolname "$voltmpl" $sourcedir`
+
+
+
+
+# +====================+
+# | CHECKING ARGUMENTS |
+# +====================+
+targetarg=0
+targetval=""
+modeargv=void
+linkargv=void
+limittype=void
+logarg=0
+numberarg=0
+sizearg=0
+sourcearg=0
+speedarg=0
+volarg=0
+print=0
+query=0
+shift=1
+abort=0
+help=0
+testrun=0
+while [ $# -gt 0 ]; do
+
+  # +---------------+
+  # | "-age" option |
+  # +---------------+
+  if [ `$echo "x$1" | grep -ic "^x-a"` -ne 0 ]; then
+    if [ `$echo $limittype | grep -c ',-d'` -ne 0 ]; then
+      cat << %
+$makcd:  the "-age" and "-date" (or "-datelimit") options are
+         mutually exclusive, i.e., they cannot be combined!"
+
+%
+      help=1
+      abort=1
+    fi
+    limittype="$limittype,-a"
+    shift
+    if [ $# -eq 0 ]; then
+      $echo "$makcd:  \"-age\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      inlimit="$1"
+      datelimit=`decode_date $1`
+      if [ x$datelimit = xinvalid ]; then
+        cat << %
+$makcd:  the specified maximum or minimum age ("-age" option) is invalid, or
+         the argument following the "-age" option has an invalid format!
+
+%
+        help=1
+        abort=1
+      elif [ `$echo x$datelimit | grep -c '^x[0-9]'` -gt 0 ]; then
+        cat << %
+$makcd:  the "-age" argument requires a RELATIVE date specification, i.e.,
+            "-##" or "-##d"   (up to ## days old),
+            "+##" or "+##d"   (more than ## days old),
+            "-##m"            (up to ## months old),
+            "+##m"            (more than ## months old),
+            "-##y"            (up to ## years old),
+            "+##y"            (more than ## years old),
+
+%
+        help=1
+        abort=1
+      fi
+    fi
+
+  # +-------------------+
+  # | "-confirm" option |
+  # +-------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-c"` -ne 0 ]; then
+    confirm=1
+
+  # +----------------------------------------+
+  # | "-d" - trap for ambiguous option entry |
+  # +----------------------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-d$"` -ne 0 ]; then
+    cat << %
+$makcd:  "$1" option is ambiguous; valid choices are:
+           -da<te<limit>>
+           -de<bug>
+           -do<wn>
+
+%
+    help=1
+    abort=1
+
+  # +--------------------------------+
+  # | "-date" or "-datelimit" option |
+  # +--------------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-da"` -ne 0 ]; then
+    if [ `$echo $limittype | grep -c ',-a'` -ne 0 ]; then
+      cat << %
+$makcd:  the "-age" and "-date" (or "-datelimit") options are
+         mutually exclusive, i.e., they cannot be combined!"
+
+%
+      help=1
+      abort=1
+    fi
+    limittype="$limittype,-d"
+    shift
+    if [ $# -eq 0 ]; then
+      cat << %
+$makcd:  "-date" / "-datelimit" argument MUST be followed by a value!
+%
+      help=1
+      abort=1
+      shift=0
+    else
+      inlimit="$1"
+      datelimit=`decode_date $1`
+      if [ x$datelimit = xinvalid ]; then
+        cat << %
+$makcd:  the specified date limit ("-date" option) is invalid, or
+         the argument following the "-date" option is not a date!
+
+%
+        help=1
+        abort=1
+      elif [ `$echo x$datelimit | grep -c '^x[-+]'` -gt 0 ]; then
+        cat << %
+$makcd:  the "-date" or "-datelimit" argument requires an ABSOLUTE date
+         specification, based on the ISO 8601 standard (yyyy-mm-dd), i.e.,
+                <<<yy>yy->m->d
+         (in this format, also "." and "/" are valid separators), or
+                <<yy<yy>mm>dd
+         (in this case, day and month MUST be specified in two-digit
+         format).
+
+%
+        help=1
+        abort=1
+      fi
+    fi
+
+  # +-----------------+
+  # | "-debug" option |
+  # +-----------------+
+  elif [ `$echo "x$1" | grep -ic "^x-de"` -ne 0 ]; then
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | grep -c '^x[0-9]$'` -eq 0 ]; then
+      debug=1
+      shift=0
+    else
+      debug=$1
+    fi
+
+  # +----------------+
+  # | "-down" option |
+  # +----------------+
+  elif [ `$echo "x$1" | grep -ic "^x-do"` -ne 0 ]; then
+    if [ `$echo $modeargv | egrep -c ',-o|,-r|,-u'` -ne 0 ]; then
+      cat << %
+$makcd:  the "-down", "-old", "-recent", and "-up" options are
+         mutually exclusive, i.e., they cannot be combined!"
+
+%
+      help=1
+      abort=1
+    fi
+    modeargv="$modeargv,-d"
+    mode=down
+
+  # +-----------------------+
+  # | "+followlinks" option |
+  # +-----------------------+
+  elif [ `$echo "x$1" | grep -ic "^x+f"` -ne 0 ]; then
+    if [ `$echo $linkargv | grep -c ',-f'` -ne 0 ]; then
+      $echo "$makcd:  \"-f\" and \"+f\" options are mutually exclusive!"
+      help=1
+      abort=1
+    fi
+    linkargv="$linkargv,+f"
+    follow_links="-f"
+
+  # +-----------------------+
+  # | "-followlinks" option |
+  # +-----------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-f"` -ne 0 ]; then
+    if [ `$echo $linkargv | grep -c ',+f'` -ne 0 ]; then
+      $echo "$makcd:  \"-f\" and \"+f\" options are mutually exclusive!"
+      help=1
+      abort=1
+    fi
+    linkargv="$linkargv,-f"
+    follow_links=""
+
+  # +----------------+
+  # | "-help" option |
+  # +----------------+
+  elif [ `$echo "x$1" | grep -ic "^x-h"` -ne 0 ]; then
+    printhelp
+
+  # +-----------------------+
+  # | "-interactive" option |
+  # +-----------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-i"` -ne 0 ]; then
+    if [ $query -gt 0 ]; then
+      $echo "$makcd:  \"-interactive\" CANNOT be used together with \"-query\"!"
+      help=1
+      abort=1
+    fi
+    interactive=1
+    confirm=1
+    print=0
+
+  # +--------------------+
+  # | "-log path" option |
+  # +--------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-l"` -ne 0 ]; then
+    if [ $logarg -gt 0 ]; then
+      $echo "$makcd:  you can only specify one logging path (\"-log\" option)!"
+      help=1
+      abort=1
+    fi
+    logarg=`expr $logarg + 1`
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | cut -c2,2` = "-" ]; then
+      $echo "$makcd:  \"-log\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      log=$1
+      if [ -d $log ]; then
+        log=$log/cd_log_$timestamp
+        loglink=1
+      fi
+      if [ `$echo $log | cut -c1,1` != "/" ]; then
+        log=`$pwd`/$log
+      fi
+      if [ `dirname $log` = $HOME ]; then
+        loglink=0
+      fi
+    fi
+
+  # +------------------+
+  # | "-manual" option |
+  # +------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-m"` -ne 0 ]; then
+    if [ -f $vnmruser/manual/$makcd ]; then
+      more $vnmruser/manual/$makcd
+    elif [ -f $vnmrsystem/manual/$makcd ]; then
+      more $vnmrsystem/manual/$makcd
+    elif [ -f manual/$makcd ]; then
+      more manual/$makcd
+    else
+      $echo "$makcd:  file \"manual/$makcd\" not found!"
+    fi
+    $echo
+    exit
+
+  # +--------------------+
+  # | "-number #" option |
+  # +--------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-n"` -ne 0 ]; then
+    if [ $numberarg -gt 0 ]; then
+      $echo "$makcd:  you have given multiple \"-number\" options!"
+      help=1
+      abort=1
+    fi
+    numberarg=`expr $numberarg + 1`
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | cut -c2,2` = "-" ]; then
+      $echo "$makcd:  \"-number\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      number=$1
+      if [ `$echo $number | grep -c '^[0-9]*$'` -ne 1 ]; then
+        $echo "$makcd:  number of copies must be specified as an integer!"
+        abort=1
+      elif [ $number -lt 1 ]; then
+        $echo "$makcd:  number of copies must be greater than 0!"
+        abort=1
+      fi
+    fi
+
+  # +---------------+
+  # | "-old" option |
+  # +---------------+
+  elif [ `$echo "x$1" | grep -ic "^x-o"` -ne 0 ]; then
+    if [ `$echo $modeargv | egrep -c ',-d|,-r|,-u'` -ne 0 ]; then
+      cat << %
+$makcd:  the "-down", "-old", "-recent", and "-up" options are
+         mutually exclusive, i.e., they cannot be combined!"
+
+%
+      help=1
+      abort=1
+    fi
+    modeargv="$modeargv,-o"
+    mode=old
+
+  # +------------------------------------------------+
+  # | "-print" option (disabled in interactive mode) |
+  # +------------------------------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-p"` -ne 0 ]; then
+    if [ $interactive -eq 0 ]; then
+      print=1
+    fi
+
+  # +---------------------------------------------------+
+  # | "-query" option (not allowed in interactive mode) |
+  # +---------------------------------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-q"` -ne 0 ]; then
+    if [ $interactive -gt 0 ]; then
+      $echo "$makcd:  \"-interactive\" CANNOT be used together with \"-query\"!"
+      help=1
+      abort=1
+    fi
+    query=1
+    interactive=0
+    confirm=0
+    print=0
+
+  # +------------------+
+  # | "-recent" option |
+  # +------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-r"` -ne 0 ]; then
+    if [ `$echo $modeargv | egrep -c ',-d|,-o|,-u'` -ne 0 ]; then
+      cat << %
+$makcd:  the "-down", "-old", "-recent", and "-up" options are
+         mutually exclusive, i.e., they cannot be combined!"
+
+%
+      help=1
+      abort=1
+    fi
+    modeargv="$modeargv,-r"
+    mode=recent
+
+  # +----------------------------------------+
+  # | "-s" - trap for ambiguous option entry |
+  # +----------------------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-s$"` -ne 0 ]; then
+    cat << %
+$makcd:  "$1" option is ambiguous; valid choices are:
+           -si<ze>
+           -sk<ip>
+           -so<urcedir>
+           -sp<eed>
+
+%
+    help=1
+    abort=1
+
+  # +------------------+
+  # | "-size #" option |
+  # +------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-si"` -ne 0 ]; then
+    if [ $sizearg -gt 0 ]; then
+      $echo "$makcd:  you have given multiple \"-size\" options!"
+      help=1
+      abort=1
+    fi
+    sizearg=`expr $sizearg + 1`
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | cut -c2,2` = "-" ]; then
+      $echo "$makcd:  \"-size\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      maxsizeMiB=$1
+      if [ `$echo $maxsizeMiB | grep -c '^[0-9]*$'` -ne 1 ]; then
+        $echo "$makcd:  media size must be specified as an integer (MiB)!"
+        abort=1
+      elif [ $maxsizeMiB -lt 1 ]; then
+        $echo "$makcd:  media size (in MiB) must be greater than 0!"
+        abort=1
+      fi
+    fi
+
+  # +----------------+
+  # | "-skip" option |
+  # +----------------+
+  elif [ `$echo "x$1" | grep -ic "^x-sk"` -ne 0 ]; then
+    skip=1
+
+  # +--------------------------+
+  # | "-sourcedir path" option |
+  # +--------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-so"` -ne 0 ]; then
+    if [ $sourcearg -gt 0 ]; then
+      $echo "$makcd:  currently, only one source directory is supported"
+      $echo "         (\"-sourcedir\" option)"
+      help=1
+      abort=1
+    fi
+    sourcearg=`expr $sourcearg + 1`
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | cut -c2,2` = "-" ]; then
+      $echo "$makcd:  \"-sourcedir\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      sourcedir=$1
+      if [ ! -d $sourcedir ]; then
+        $echo "$makcd:  archiving source directory $source not found!"
+        abort=1
+      fi
+      if [ `$echo $sourcedir | cut -c1,1` != "/" ]; then
+        sourcedir=`$pwd`/$sourcedir
+      fi
+      volname=`setvolname "$voltmpl" $sourcedir`
+    fi
+
+  # +-------------------+
+  # | "-speed #" option |
+  # +-------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-sp"` -ne 0 ]; then
+    if [ $speedarg -gt 0 ]; then
+      $echo "$makcd:  you have given multiple \"-speed\" options!"
+      help=1
+      abort=1
+    fi
+    speedarg=`expr $speedarg + 1`
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | cut -c2,2` = "-" ]; then
+      $echo "$makcd:  \"-speed\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      speed=$1
+      if [ `$echo $speed | grep -c '^[0-9]*$'` -ne 1 ]; then
+        $echo "$makcd:  CD-R/RW speed must be specified as an integer!"
+        abort=1
+      fi
+    fi
+
+  # +----------------+
+  # | "-test" option |
+  # +----------------+
+  elif [ `$echo "x$1" | grep -ic "^x-t"` -ne 0 ]; then
+    testrun=1
+
+  # +--------------+
+  # | "-up" option |
+  # +--------------+
+  elif [ `$echo "x$1" | grep -ic "^x-u"` -ne 0 ]; then
+    if [ `$echo $modeargv | egrep -c ',-d|,-o|,-r'` -ne 0 ]; then
+      cat << %
+$makcd:  the "-down", "-old", "-recent", and "-up" options are
+         mutually exclusive, i.e., they cannot be combined!"
+
+%
+      help=1
+      abort=1
+    fi
+    modeargv="$modeargv,-u"
+    mode=up
+
+  # +----------------------------------------+
+  # | "-v" - trap for ambiguous option entry |
+  # +----------------------------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-v$"` -ne 0 ]; then
+    cat << %
+$makcd:  "$1" option is ambiguous; valid choices are:
+           -ve<rsion>
+           -vo<lname>
+
+%
+    help=1
+    abort=1
+
+  # +-------------------+
+  # | "-version" option |
+  # +-------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-ve"` -ne 0 ]; then
+    $echo "$makcd version $version ($revdate)"
+    $echo
+    exit
+
+  # +-------------------+
+  # | "-volname" option |
+  # +-------------------+
+  elif [ `$echo "x$1" | grep -ic "^x-vo"` -ne 0 ]; then
+    shift
+    if [ $# -eq 0 -o `$echo x$1 | cut -c2,2` = "-" ]; then
+      $echo "$makcd:  \"-sourcedir\" argument MUST be followed by a value!"
+      help=1
+      abort=1
+      shift=0
+    else
+      voltmpl="$1"
+      volname=`setvolname "$voltmpl" $sourcedir`
+    fi
+
+  # +--------------------------------+
+  # | unknown option - error / abort |
+  # +--------------------------------+
+  elif [ `$echo "x$1" | grep -c '^x-'` -ne 0 ]; then
+    $echo "$makcd:  unknown option \"$1\";"
+    help=1
+    abort=1
+
+  # +-----------------+
+  # | target argument |
+  # +-----------------+
+  elif [ $targetarg -eq 0 ]; then
+    targetval=$1
+    targetarg=`expr $targetarg + 1`
+
+    # +-----------------------------+
+    # | check for directory targets |
+    # +-----------------------------+
+    if [ -d $targetval ]; then
+      if [ `$echo $targetval | cut -c1,1` != "/" ]; then
+        targetval=`$pwd`/$targetval
+      fi
+      targetdir=$targetval
+      target=$targetdir/cd_$timestamp
+    else
+      tail=`$echo $targetval | $awk '{print substr($1,length($1)-3,4)}'`
+      if [ $tail = ".iso" ]; then
+        target=`$echo $targetval | $awk '{print substr($1,1,length($1)-4)}'`
+      else
+        target=$targetval
+      fi
+      targetdir=`dirname $target`
+
+      # +--------------------------------+
+      # | check for (CD-R) device target |
+      # +--------------------------------+
+      device=`checkdevice $target`
+      if [ $? -ne 0 ]; then
+        $echo "$makcd:  target device CANNOT be a UFS file system!"
+        abort=1
+      fi
+      if [ $target = /dev/cdrw -o x$device != x ]; then
+        if [ $cdrw -eq 0 ]; then
+          $echo "$makcd:  to write CD-R media you need the command \"cdrw\"!"
+          abort=1
+        fi
+      else
+
+        # +------------------------------+
+        # | target is ISO9660 disk image |
+        # +------------------------------+
+        if [ `$echo $target | cut -c1,1` != "/" ]; then
+          target=`$pwd`/$target
+          targetdir=`$pwd`/$targetdir
+        fi
+      fi
+    fi
+
+  # +---------------------------------------------+
+  # | catch case where multiple targets are given |
+  # |    (= unknown args without preceding "-")   |
+  # +---------------------------------------------+
+  else
+    targetarg=`expr $targetarg + 1`
+    targetval="$targetval,$1"
+    abort=1
+  fi
+  if [ $shift -eq 1 ]; then
+    shift
+  else
+    shift=1
+  fi
+done
+if [ $targetarg -gt 1 ]; then
+  $echo "$makcd:  The target can only be specified once - \c"
+  $echo "you specified $targetarg values:"
+  $echo "         $targetval"
+fi
+# +============================+
+# | ARGUMENT CHECKING ENDS HERE|
+# +============================+
+
+
+
+# +----------------------------------------+
+# | if target is /dev/*, write CD directly |
+# +----------------------------------------+
+if [ $target = /dev/cdrw -o x$device != x ]; then
+  write_cd=1
+else
+  write_cd=0
+fi
+
+
+# +-------------------------------------------------------------+
+# | Check (again) whether target is a CD-R drive, verify device |
+# +-------------------------------------------------------------+
+device=`checkdevice $target`
+if [ $? -ne 0 ]; then
+  $echo "$makcd:  target device CANNOT be a UFS file system!"
+  abort=1
+fi
+
+
+# +-----------------------------------------------------------------------+
+# | If target is meant to be a CD-R/RW drive and "cdrw" is absent, abort. |
+# +-----------------------------------------------------------------------+
+if [ $write_cd -ne 0 -a $cdrw -eq 0 ]; then
+  $echo "$makcd:  to write CD-R media you need the command \"cdrw\"!"
+  abort=1
+fi
+
+
+# +-----------------------------------------------+
+# | abort in the case of argument or other errors |
+# +-----------------------------------------------+
+if [ $abort -ne 0 ]; then
+  if [ $help  -gt 0 ]; then
+    printhelp
+  else
+    $echo "   aborting."
+    $echo
+    exit
+  fi
+fi
+
+
+# +-------------------------------+
+# | set volume name from template |
+# +-------------------------------+
+volname=`setvolname "$voltmpl" $sourcedir`
+
+
+
+# +===========================+
+# | INTERACTIVE INPUT SECTION |
+# +===========================+
+
+# +---------------+
+# | output header |
+# +---------------+
+cat << %
+
+ Creating ISO9660 Data Archive - $makcd $version ($revdate)
+-------------------------------------------------------------------------------
+%
+
+
+# +=================================+
+# | INTERACTIVE SECTION STARTS HERE |
+# +=================================+
+if [ $interactive -ne 0 ]; then
+  $echo
+
+  # +----------------------------+
+  # | SOURCE DIRECTORY SELECTION |
+  # +----------------------------+
+  ok=0
+  trials=3
+  while [ $ok -eq 0 -a $trials -gt 0 ]; do
+    trials=`expr $trials - 1`
+    cat << %
+Current "source" directory from which data will be archived:
+        $sourcedir
+   ==> Enter alternative path to change this setting, to leave the path
+%
+    $echo "       unchanged type <Return>: \c"
+    read ans
+    if [ "x$ans" = x ]; then
+      ok=1
+    else
+      if [ -d $ans ]; then
+        if [ `ls -d $ans/* | wc -l` -eq 0 ]; then
+          $echo "This directory is empty!"
+        else
+          sourcedir=$ans
+          ok=1
+        fi
+      else
+        $echo "The specified path does not exist!"
+      fi
+      if [ $ok -eq 0 ]; then
+        if [ $trials -gt 0 ]; then
+          $echo "   ==> You have $trials more trial(s); try again (y|n) [y]? \c"
+          read ans2
+          if [ `$echo $ans2 | grep -ic 'n'` -ne 0 ]; then
+            trials=0
+            ok=0
+          fi
+        fi
+      else
+        if [ `$echo $sourcedir | cut -c1,1` != "/" ]; then
+          sourcedir=`$pwd`/$sourcedir
+        fi
+      fi
+    fi
+  done
+  if [ $ok -eq 0 ]; then
+    $echo "   aborting."
+    $echo
+    exit
+  fi
+  $echo
+
+
+  # +-----------------------------------------+
+  # | "up"/"old"/"down"/"recent" MODE INQUIRY |
+  # +-----------------------------------------+
+  if [ $mode = recent ]; then
+    cat << %
+If the amount of data un the above source directory exceeds the capacity
+of the media, "$makcd" is currently set up to limit the archive to the
+most RECENT data (i.e., the oldest data sets will NOT be archived).
+The following alternative options are available:
+  - down (d):   start with most recent data (multiple media, if necessary)
+  - recent (r): (currently selected)
+  - up (u):     start with most recent data (multiple media, if necessary)
+  - old (o):    oldest data, up to the size of the media (1 CD only)
+%
+  elif [ $mode = old ]; then
+    cat << %
+If the amount of data un the above source directory exceeds the capacity
+of the media, "$makcd" is currently set up to limit the archive to the
+OLDEST data (i.e., the MOST RECENT DATA will NOT be archived).
+The following alternative options are available:
+  - down (d):   start with most recent data (multiple media, if necessary)
+  - recent (r): most recent data, up to the size of the media (1 CD only)
+  - up (u):     start with most recent data (multiple media, if necessary)
+  - old (o):    (currently selected)
+%
+  elif [ $mode = down ]; then
+    cat << %
+"$makcd" is currently set up to start archiving with the most recent data
+in the source directory (reverse chronological order), down to the oldest
+data sets. "$makcd" will prompt for new media to be inserted, if necessary.
+The following alternative options are available:
+  - down (d):   (currently selected)
+  - recent (r): most recent data, up to the size of the media (1 CD only)
+  - up (u):     start with most recent data (multiple media, if necessary)
+  - old (o):    oldest data, up to the size of the media (1 CD only)
+%
+  elif [ $mode = up ]; then
+    cat << %
+"$makcd" is currently set up to start archiving with the oldest data sets
+in the source directory (chronological order), up to the most recent data.
+"$makcd" will prompt for new media to be inserted, if necessary.
+The following alternative options are available:
+  - down (d):   start with most recent data (multiple media, if necessary)
+  - recent (r): most recent data, up to the size of the media (1 CD only)
+  - up (u):     (currently selected)
+  - old (o):    oldest data, up to the size of the media (1 CD only)
+%
+  else
+    $echo "$makcd:  UNKNOWN ARCHIVING MODE \"$mode\"!"
+  fi
+  if [ $write_cd -ne 0 ]; then
+    cat << %
+To leave the current mode unchanged, just enter <Return> below; note that
+with the "down" and "up" modes you will be prompted to insert blank media:
+%
+  else
+    cat << %
+To leave the current mode unchanged, just enter <Return> below.
+%
+  fi
+  $echo "   ==> Enter your selection (d|r|u|o|<Return>): \c"
+  ok=0
+  trial=0
+  while [ $ok -eq 0 -a $trial -lt 3 ]; do
+    read ans
+    if [ "x$ans" = xd -o "x$ans" = xD ]; then
+      mode=down
+      ok=1
+    elif [ "x$ans" = xo -o "x$ans" = xO ]; then
+      mode=old
+      ok=1
+    elif [ "x$ans" = xr -o "x$ans" = xR ]; then
+      mode=recent
+      ok=1
+    elif [ "x$ans" = xu -o "x$ans" = xU ]; then
+      mode=up
+      ok=1
+    elif [ "x$ans" = x ]; then
+      ok=1
+    else
+      $echo "       Your selection must be one of (d|r|u|o|<Return>): "
+    fi
+    trial=`expr $trial + 1`
+  done
+  if [ $mode = recent ]; then
+    $echo "The archive MAY be limited to the MOST RECENT data."
+  elif [ $mode = old ]; then
+    $echo "The archive MAY be limited to the OLDEST data sets."
+  elif [ $mode = down ]; then
+    $echo "The archiving MAY require multiple media; archiving in"
+    $echo "   reverse chronological order, most recent files first."
+  elif [ $mode = up ]; then
+    $echo "The archiving MAY require multiple media; archiving in"
+    $echo "   chronological order, oldest files first."
+  fi
+  $echo
+
+
+  # +--------------------+
+  # | DATE LIMIT INQUIRY |
+  # +--------------------+
+  ok=0
+  pass=0
+  trials=3
+  while [ $ok -eq 0 -a $trials -gt 0 ]; do
+    trials=`expr $trials - 1`
+    pass=`expr $pass + 1`
+    check=`decode_date $inlimit`
+    if [ "x$check" = "xnone" ]; then
+      if [ $mode = old -o $mode = recent ]; then
+        cat << %
+Currently, "$makcd" is set up to archive ALL data in the specified source
+directory, up to the capacity of the archival media. However, you can
+select to archive only a subset of the files, depending on when the data
+were created or last modified. The available options are:
+%
+      else
+        cat << %
+Currently, "$makcd" is set up to archive ALL data in the specified source
+directory. However, you can select to archive only a subset of the files,
+depending on when the data were created or last modified. The options are:
+%
+      fi
+    else
+      cat << %
+Currently, "$makcd" is set up to use a date limit in order to select only a
+subset of the data in the specified source directory, depending on when the
+data were created or last modified. Current restriction:
+%
+      $echo "        \c"
+      decode_date -show $inlimit
+      cat << %
+You may disable this restriction or change the date limit; the available
+options are:
+%
+    fi
+    cat << %
+ - enter <Return> to leave the current setting unchanged;
+ - enter "none" to disable / avoid any date limit / restriction;
+ - select data that have been created / modified LESS THAN a XX days /
+   months / years ago, by entering "-XXd", "-XXm", "-XXy";
+ - select data that have been created / last modified MORE THAN a XX
+   days / months / years ago, by entering "+XXd", "+XXm", "+XXy";
+%
+    if [ $mode = old -o $mode = up ]; then
+      cat << %
+ - select data that have been created / last modified PRIOR TO a specific
+   date, by entering that date in the format "yyyy-mm-dd" or "yyyymmdd";
+%
+    else
+      cat << %
+ - select data that have been created / modified AFTER a specific date,
+   by entering that date in the format "yyyy-mm-dd" or "yyyymmdd";
+%
+    fi
+    if [ $pass -le 1 ]; then
+      cat << %
+ - type "?" to obtain a detailed explanation on the age / date limit
+   entry format options.
+%
+    fi
+    $echo "Enter age / date limit, <Return>, or type \"?\" for explanations now!"
+    $echo "   ==> Age / date limit entry: \c"
+    read ans
+    if [ "x$ans" = x ]; then
+      ok=1
+    elif [ "x$ans" = 'x?' ]; then
+      explaindatelimit
+      cat << %
+Now, you have the option either to enter <Return> to leave the current
+date limit unchanged, or to enter a new limit.
+%
+      $echo "   ==> Enter age / date limit: \c"
+      read ans
+      if [ "x$ans" = x ]; then
+        ok=1
+      fi
+    else
+      newlimit="`decode_date $ans`"
+      if [ "x$newlimit" != xinvalid ]; then
+        datelimit="$newlimit"
+        inlimit=$ans
+        $echo "News age / date limit restriction:"
+        $echo "        \c"
+        decode_date -show $ans
+        ok=1
+      else
+        $echo "The specified age / date limit format is invalid!"
+        $echo "   ==> You have $trials more trial(s); try again (y|n) [y]? \c"
+        read ans2
+        if [ `$echo $ans2 | grep -ic 'n'` -ne 0 ]; then
+          trials=0
+          ok=0
+        fi
+      fi
+    fi
+  done
+  if [ $ok -eq 0 ]; then
+    $echo "   Entry failed - using previous age / date limit setting:"
+    $echo "        \c"
+    decode_date -show $inlimit
+  fi
+  $echo
+
+
+  # +-----------------------+
+  # | VOLUME NAME SELECTION |
+  # +-----------------------+
+  ok=0
+  pass=0
+  origvoltmpl=$voltmpl
+  origvolname=$volname
+  trials=3
+  while [ $ok -eq 0 -a $trials -gt 0 ]; do
+    trials=`expr $trials - 1`
+    pass=`expr $pass + 1`
+    if [ "$voltmpl" != "$volname" ]; then
+      cat << %
+Currently, "$makcd" uses the volume name template
+        $voltmpl
+which translates to the actual volume name
+        $volname
+You may now
+ - enter a DIFFERENT NAME TEMPLATE (which may also be a fixed string that
+   does not include template "placeholders");
+ - type <Return> to leave the above volume name setting unchanged;
+%
+    else
+      cat << %
+Currently, "$makcd" uses a fixed volume name
+        $volname
+You may now
+ - enter a DIFFERENT VOLUME NAME;
+ - enter a new volume name as name TEMPLATE using "placeholder variables"
+ - type <Return> to leave the above volume name setting unchanged;
+%
+    fi
+    if [ $pass -le 1 ]; then
+      cat << %
+ - type "?" to obtain a detailed explanation on the template / placeholder
+   mechanism.
+%
+    fi
+    $echo "Please enter a new template, \"?\" for explanations, or <Return> now!"
+    $echo "   ==> New template entry: \c"
+    read ans
+    if [ "x$ans" = x ]; then
+      ok=1
+    elif [ "x$ans" = 'x?' ]; then
+      explainvolname
+      cat << %
+Now, you have the option either to enter <Return> to leave the current
+volume name
+        $volname
+unchanged, or to enter a new volume name / template, with or without
+template placeholders.
+%
+      $echo "   ==> Enter volume name / template: \c"
+      read ans
+      if [ "x$ans" = x ]; then
+        ok=1
+      fi
+    fi
+    if [ $ok -eq 0 ]; then
+      voltmpl="$ans"
+      volname=`setvolname "$voltmpl" $sourcedir`
+      $echo "The new volume name is set to"
+      $echo "        $volname"
+      $echo "   ==> OK to proceed (y|n) [y]? \c"
+      read ans2
+      if [ `$echo $ans2 | grep -ic 'n'` -ne 0 ]; then
+        voltmpl=$origvoltmpl
+        volname=$origvolname
+        if [ $trials -gt 0 ]; then
+          $echo "   ==> You have $trials more trial(s); try again (y|n) [y]? \c"
+          read ans2
+          if [ `$echo $ans2 | grep -ic 'n'` -ne 0 ]; then
+            trials=0
+            ok=0
+          fi
+        fi
+      else
+        ok=1
+      fi
+    fi
+  done
+  if [ $ok -eq 0 ]; then
+    $echo "   Entry failed - using original volume name setting."
+  fi
+  $echo
+
+
+  # +----------------------+
+  # | FOLLOW LINKS INQUIRY |
+  # +----------------------+
+  if [ x$follow_links = x-f ]; then
+    cat << %
+Currently, "$makcd" is set up to "follow symbolic links".
+   ==> Do you want to CHANGE this setting, such that
+%
+    $echo "       symbolic links are NOT followed (y|?|n) [n]: \c"
+    read ans
+    if [ "x$ans" = 'x?' ]; then
+      explainfollowlinks
+      $echo "   ==> Do you want to CHANGE this setting, such that"
+      $echo "       symbolic links are NOT followed (y|n) [n]: \c"
+      read ans
+    fi
+    if [ `$echo $ans | grep -ic y` -ne 0 ]; then
+      follow_links=""
+    fi
+  else
+    cat << %
+Currently, "$makcd" is set up NOT to "follow symbolic links".
+   ==> Do you want to CHANGE this setting, such that
+%
+    $echo "       link TARGETS are INCLUDED (y|?|n) [y]: \c"
+    read ans
+    if [ "x$ans" = 'x?' ]; then
+      explainfollowlinks
+      $echo "   ==> Do you want to CHANGE this setting, such that"
+      $echo "       link TARGETS are INCLUDED (y|n) [n]: \c"
+      read ans
+    fi
+    if [ `$echo $ans | grep -ic n` -eq 0 ]; then
+      follow_links="-f"
+    fi
+  fi
+  if [ x$follow_links = x-f ]; then
+    $echo "Targets of symbolic links will be INCLUDED in the archive."
+  else
+    $echo "Symbolic links will NOT be replaced by their link targets."
+  fi
+  $echo
+
+
+  # +--------------------------------+
+  # | TARGET FILE / DEVICE SELECTION |
+  # +--------------------------------+
+  origtarget=$target
+  trials=3
+  ok=0
+  while [ $ok -eq 0 -a $trials -gt 0 ]; do
+    trials=`expr $trials - 1`
+    if [ $cdrw -ne 0 ]; then
+      if [ $target != /dev/cdrw -a x$device = x ]; then
+        cat << %
+Currently, $makcd is set up to archive into an ISO9660 disk image
+        ${target}.iso
+   ==> To switch to direct CD-R archiving you may enter the nickname (such
+       as "cdrom" or "cdrom1") or the device name (such as "/dev/c0t6d0s0")
+       of the CD-R/RW drive ("/dev/cdrw" would select the default device);
+       you may also specify an alternative path for the ISO9660 disk image;
+       to leave the selection unchanged, just
+%
+        $echo "       type <Return>: \c"
+      else
+        cat << %
+Current selection is direct archiving on "${target}.iso";
+   ==> To switch to creating an ISO9660 disk image for external burning,
+       enter the path for that image file now; you may also specify an
+       alternative target device; to leave the selection unchanged, just
+%
+        $echo "       type <Return>: \c"
+      fi
+    else
+      cat << %
+Currently, $makcd is set up to archive into an ISO9660 disk image
+        ${target}.iso
+   ==> You can enter an new target path here;
+%
+      $echo "       to leave the setting as is, enter <Return>: \c"
+    fi
+    read ans
+    if [ "x$ans" = x ]; then
+      if [ $target != /dev/cdrw -a x$device = x ]; then
+        $echo "Target selection (${target}.iso) unchanged."
+      else
+        $echo "Target selection ($target) unchanged."
+      fi
+      ok=1
+      trials=0
+    else
+      targetval=$ans
+
+      # +-----------------------------+
+      # | check for directory targets |
+      # +-----------------------------+
+      ok=1
+      if [ -d $targetval -a -w $targetval ]; then
+        if [ `$echo $targetval | cut -c1,1` != "/" ]; then
+          targetval=`$pwd`/$targetval
+        fi
+        targetdir=$targetval
+        target=$targetdir/cd_$timestamp
+        $echo "Archiving to ISO9660 disk image at"
+        $echo "        ${target}.iso"
+
+      else
+        tail=`$echo $targetval | $awk '{print substr($1,length($1)-3,4)}'`
+        if [ $tail = ".iso" ]; then
+          target=`$echo $targetval | $awk '{print substr($1,1,length($1)-4)}'`
+        else
+          target=$targetval
+        fi
+        targetdir=`dirbane $target`
+
+        # +--------------------------------+
+        # | check for (CD-R) device target |
+        # +--------------------------------+
+        device=`checkdevice $target`
+        if [ $? -ne 0 ]; then
+          $echo "$makcd:  target device CANNOT be a UFS file system!"
+          ok=0
+        fi
+        if [ $target = /dev/cdrw -o x$device != x ]; then
+          if [ $cdrw -ne 0 ]; then
+            $echo "Direct archiving on CD-R/RW selected."
+            $echo "        Device: \"$device\""
+            write_cd=1
+            ok=1
+          else
+            $echo "Direct archiving on CD-R/RW not available!"
+            ok=0
+          fi
+        else
+          # +------------------------------+
+          # | target is ISO9660 disk image |
+          # +------------------------------+
+          write_cd=0
+          if [ `$echo $target | cut -c1,1` != "/" ]; then
+            target=`$pwd`/$target
+            targetdir=`$pwd`/$targetdir
+          fi
+          td=`dirname $target`
+          while [ $td != / -a ! -d $td ]; do
+            td=`dirname $td`
+          done
+          if [ ! -w $td ]; then
+            if [ -d $targetdir ]; then
+              cat << %
+$makcd:  directory $targetdir is not writable!
+%
+            else
+              cat << %
+$makcd:  directory $targetdir can't be created!
+%
+            fi
+            ok=0
+          else
+            ok=1
+            $echo "Archiving to ISO9660 disk image at"
+            $echo "        ${target}.iso"
+          fi
+        fi
+      fi
+      if [ $ok -eq 1 ]; then
+        $echo "   ==> OK to proceed (y|n) [y]? \c"
+        read ans
+        if [ `$echo $ans | grep -ic 'n'` -ne 0 ]; then
+          ok=0
+          trials=0
+        fi
+      fi
+    fi
+  done
+  if [ $ok -eq 0 ]; then
+    $echo "   aborting."
+    $echo
+    exit
+  fi
+  $echo
+
+
+  # +--------------------+
+  # | MEDIA SIZE INQUIRY |
+  # +--------------------+
+  if [ $write_cd -ne 0 ]; then
+    cat << %
+The archival media capacity is currently assumed to be $maxsizeMiB MiB.
+%
+  else
+    cat << %
+The size of the ISO9660 disk image is currently limited to $maxsizeMiB MiB.
+%
+  fi
+  cat << %
+   ==> You may now enter a different media size (in MiB); to leave
+%
+  $echo "       the current setting unchanged, enter 0 or <Return>: \c"
+  read ans
+  if [ "x$ans" != x ]; then
+    if [ `$echo $ans | grep -c '^[0-9]*$'` -ne 1 ]; then
+      $echo "$makcd:  media size must be specified as an integer (MiB),"
+      $echo "         returning to previous setting of $maxsizeMiB MiB."
+    elif [ $ans -gt 0 ]; then
+      maxsizeMiB=$ans
+      $echo "Media size set to $maxsizeMiB MiB."
+    else
+      $echo "Media size unchanged: $maxsizeMiB MiB."
+    fi
+  else
+    $echo "Media size unchanged: $maxsizeMiB MiB."
+  fi
+  $echo
+
+
+  # +-------------------------------------+
+  # | SKIPPING LARGE SUBDIRECTORY INQUIRY |
+  # +-------------------------------------+
+  if [ $skip -eq 1 ]; then
+    cat << %
+"$makcd" will scan the source directory for subdirectories that are
+larger than the capacity of the archival media; if such directories
+are found, they will be EXCLUDED from the archive, but a warning will
+be placed in the log file.
+%
+    if [ $confirm -eq 1 ]; then
+      cat << %
+   ==> Would you rather like to be prompted whether to continue or to
+       abort the archival process if such subdirectories are detected
+%
+      $echo "       directory (y|n) [n]? \c"
+    else
+      cat << %
+   ==> Would you rather like the archival process to be aborted if
+%
+      $echo "       such subdirectories are detected (y|n) [n]? \c"
+    fi
+    read ans
+    if [ `$echo $ans | grep -ic y` -ne 0 ]; then
+      skip=0
+    fi
+  else
+    if [ $confirm -eq 1 ]; then
+      cat << %
+If oversize subdirectories (i.e., subdirectories that would not fit onto
+the archival media) are found, "$makcd" is currently set up to prompt
+you whether to skip these subdirectories or whether to abort the archival.
+%
+    else
+      cat << %
+If oversize subdirectories (i.e., subdirectories that would not fit onto
+the archival media) are found, "$makcd" is currently set up to abort the
+archiving.
+%
+    fi
+    cat << %
+   ==> Would you rather like such subdirectories to be skipped and a
+%
+    $echo "       warning to be placed in the archival log file (y|n) [n]? \c"
+    read ans
+    if [ `$echo $ans | grep -ic y` -ne 0 ]; then
+      skip=1
+    fi
+  fi
+  if [ $skip -eq 1 ]; then
+    $echo "Oversize subdirectories will be excluded from the archival."
+  elif [ $confirm -eq 1 ]; then
+    $echo "In the case of oversize subdirectories you will be prompted."
+  else
+    $echo "The archiving will abort if oversize subdirectories are found."
+  fi
+  $echo
+
+
+  # +------------------+
+  # | LOG FILE INQUIRY |
+  # +------------------+
+  ok=0
+  trials=3
+  while [ $ok -eq 0 -a $trials -gt 0 ]; do
+    trials=`expr $trials - 1`
+    cat << %
+Currently, $makcd lists the archived files from the above directory in
+an archiving log file
+        $log
+   ==> You may now enter an alternative log file path;
+       to leave the current setting unchanged, just
+%
+    $echo "       type <Return>: \c"
+    read ans
+    if [ "x$ans" = x ]; then
+      $echo "Log file path unchanged."
+      ok=1
+    else
+      origlog=$log
+      log=$ans
+      if [ -d $log ]; then
+        logdir=$log
+        log=$log/cd_log_$timestamp
+        loglink=1
+      else
+        logdir=`dirname $log`
+      fi
+      if [ `$echo $log | cut -c1,1` != "/" ]; then
+        log=`$pwd`/$log
+        logdir=`$pwd`/$logdir
+      fi
+    fi
+    if [ -d $logdir -a ! -w $logdir ]; then
+      $echo "$makcd:  Directory \"$logdir\" exists, but is not writable!"
+      log=$origlog
+    elif [ ! -d $logdir ]; then
+      ld=`dirname $logdir`
+      while [ $ld != / -a ! -d $ld ]; do
+        ld=`dirname $ld`
+      done
+      if [ ! -w $ld ]; then
+        $echo "$makcd:  Cannot create log directory \"$logdir\""
+        log=$origlog
+      else
+        ok=1
+      fi
+    else
+      $echo "Log file path: \"$log\""
+      ok=1
+      if [ `dirname $log` = $HOME ]; then
+        loglink=0
+      fi
+    fi
+    if [ $trials -gt 0 -a $ok -eq 0 ]; then
+      $echo "You have $trials more trial(s)."
+    fi
+  done
+  $echo
+
+
+  # +-----------------------------------+
+  # | SPEED INQUIRY (DIRECT WRITE ONLY) |
+  # +-----------------------------------+
+  if [ $write_cd -ne 0 ]; then
+    $echo "Speed setting for writing to CD-R/RW disk:"
+    if [ $speed -eq 0 ]; then
+      $echo "    \"$makcd\" currently uses the drive's default speed."
+    else
+      $echo "    \"$makcd\" currently will use ${speed}x speed when writing."
+    fi
+    oldspeed=speed
+    trial=3
+    ok=0
+    while [ $trial -gt 0 -a $ok -eq 0 ]; do
+      trial=`expr $trial - 1`
+      cat << %
+You may now change the above speed setting:
+        - to leave the setting as is, enter <Return>;
+        - to use the drive's default speed, enter "0";
+        - to specify a new speed enter an integer ("4" means 4x speed);
+        - for explanations enter "?".
+%
+      $echo "   ==> Enter your selection: \c"
+      read ans
+      if [ "x$ans" = 'x?' ]; then
+        explainspeed
+        $echo "   ==> Please enter your speed selection (<Return> = unchanged,"
+        $echo "       \"0\" = default speed, \"N\" = Nx speed: \c"
+        read ans
+      fi
+      if [ "x$ans" = x ]; then
+        ok=1
+        trial=0
+      elif [ `$echo $ans | grep -c '^[0-9]*$'` -eq 1 ]; then
+        speed=$ans
+        ok=1
+        trial=0
+      else
+        $echo "Only \"0\", positive integer values, or <Return> are accepted!"
+      fi
+    done
+    if [ $ok -eq 0 ]; then
+      $echo "$makcd:  Speed entry unsuccessful!"
+      $echo "   aborting."
+      $echo
+      exit
+    elif [ $speed -eq $oldspeed ]; then
+      $echo "Speed setting unaltered: \c"
+    else
+      $echo "Speed setting adjusted: \c"
+    fi
+    if [ $speed -eq 0 ]; then
+      $echo "using the drive's default speed."
+    else
+      $echo "using ${speed}x speed when writing."
+    fi
+  fi
+  $echo
+
+
+  # +-------------------------------------------+
+  # | NUMBER_COPIES INQUIRY (DIRECT WRITE ONLY) |
+  # +-------------------------------------------+
+  if [ $write_cd -ne 0 ]; then
+    $echo "Number of archival copies currently selected: $number"
+    oldnum=number
+    trial=3
+    ok=0
+    while [ $trial -gt 0 -a $ok -eq 0 ]; do
+      trial=`expr $trial - 1`
+      cat << %
+You may now specify a different number of archival copies:
+        - to leave the setting as is, enter "0" or simply <Return>;
+        - otherwise specify the number of archival copies to be made.
+%
+      $echo "   ==> Enter number of copies: \c"
+      read ans
+      if [ "x$ans" = x -o "x$ans" = x0 ]; then
+        ok=1
+        trial=0
+      elif [ `$echo $ans | grep -c '^[0-9]*$'` -eq 1 ]; then
+        number=$ans
+        ok=1
+        trial=0
+      else
+        $echo "Only \"0\", positive integer values, or <Return> are accepted!"
+      fi
+    done
+    if [ $ok -eq 0 ]; then
+      $echo "$makcd:  entry of number of archival copies unsuccessful!"
+      $echo "   aborting."
+      $echo
+      exit
+    elif [ $number -eq $oldnum ]; then
+      $echo "Number of copies unchanged: $number"
+    else
+      $echo "Number of copies changed to $number"
+    fi
+  fi
+  $echo
+fi
+# +===============================+
+# | INTERACTIVE SECTION ENDS HERE |
+# +===============================+
+
+
+
+# +---------------------------+
+# | checking source directory |
+# +---------------------------+
+if [ ! -d $sourcedir ]; then
+  $echo "$makcd:  directory $sourcedir not accessible!"
+  $echo "   aborting."
+  $echo
+  exit
+fi
+
+
+############################
+# TO BE MOVED DOWN !!!
+############################
+if [ $write_cd -eq 0 ]; then
+  targetdir=`dirname $target`
+  td=`dirname $target`
+  while [ $td != / -a ! -d $td ]; do
+    td=`dirname $td`
+  done
+  if [ ! -w $td ]; then
+    if [ -d $targetdir ]; then
+      cat << %
+$makcd:  directory $targetdir is not writable!
+
+   aborting.
+
+%
+    else
+      cat << %
+$makcd:  directory $targetdir can't be created!
+
+   aborting.
+
+%
+    fi
+    exit
+  fi
+  if [ ! -d $targetdir ]; then
+    mkdir -p $targetdir 2>/dev/null
+  fi
+  if [ ! -w $targetdir ]; then
+    cat << %
+$makcd:  directory $targetdir can't be created!
+
+   aborting.
+
+%
+    exit
+  fi
+fi
+
+
+# +-----------------------------------------+
+# | make sure directory for log file exists |
+# +-----------------------------------------+
+logdir=`dirname $log`
+ld=`dirname $log`
+while [ $ld != / -a ! -d $ld ]; do
+  ld=`dirname $ld`
+done
+if [ ! -w $ld ]; then
+  if [ -d $logdir ]; then
+    cat << %
+$makcd:  directory $logdir is not writable!
+
+   aborting.
+
+%
+  else
+    cat << %
+$makcd:  directory $logdir can't be created!
+
+   aborting.
+
+%
+  fi
+  exit
+fi
+if [ ! -d $logdir ]; then
+  mkdir -p $logdir 2>/dev/null
+fi
+if [ ! -w $logdir ]; then
+  cat << %
+$makcd:  directory $logdir can't be created!
+
+   aborting.
+
+%
+  exit
+fi
+
+
+
+# +----------------------------------------------------------+
+# | turn on confirm mode when writing (possibly several) CDs |
+# +----------------------------------------------------------+
+if [ $write_cd -ne 0 -a \( $mode = up -o $mode = down \) ]; then
+  confirm=1
+fi
+
+
+# +--------------------------------------------------------------+
+# | make sure the ISO9660 target is outside the source directory |
+# +--------------------------------------------------------------+
+if [ $write_cd -eq 0 -a `$echo $target | grep -c '/'` -ne 0 ]; then
+  tdir=`dirname $target`
+  cd $tdir
+  tdir=`$pwd`
+  cd $sourcedir
+  sdir=`$pwd`
+  srclen=`$echo $sdir | $awk '{print length($1)}'`
+  ptarget=`$echo $tdir | cut -c1-$srclen`
+  if [ $ptarget = $sdir ]; then
+    cat << %
+$makcd:  An ISO9660 target
+                ${target}.iso
+         would be inside the selected source directory
+                $sourcedir
+         This would lead to recursion in the archiving process
+         and is NOT ALLOWED!
+
+   aborting.
+
+%
+    exit
+  fi
+fi
+
+
+# +--------------------------------------------------------+
+# | make sure the log file is outside the source directory |
+# +--------------------------------------------------------+
+if [ $write_cd -eq 0 -a `$echo $target | grep -c '/'` -ne 0 ]; then
+  ldir=`dirname $log`
+  cd $ldir
+  ldir=`$pwd`
+  cd $sourcedir
+  sdir=`$pwd`
+  srclen=`$echo $sdir | $awk '{print length($1)}'`
+  plog=`$echo $ldir | cut -c1-$srclen`
+  if [ $plog = $sdir ]; then
+    cat << %
+$makcd:  An archiving log file
+                $log
+         would be inside the selected source directory
+                $sourcedir
+         This would lead to recursion in the archiving process
+         and is NOT ALLOWED!
+
+   aborting.
+
+%
+    exit
+  fi
+fi
+
+
+# +-------------------------------------------+
+# | check number of files in source directory |
+# +-------------------------------------------+
+cd $sourcedir
+entries=`ls -d * 2> /dev/null | wc -l | $awk '{print $1}'`
+if [ $entries -eq 0 ]; then
+  $echo "$makcd:  directory $sourcedir is empty!"
+  $echo "   aborting."
+  $echo
+  exit
+fi
+archived=$entries
+xlist=$log.xlist
+flist=$log.flist
+touch $xlist
+touch $flist.00
+maxsizeKiB=`expr $maxsizeMiB \* 1024`
+
+
+# +-------------------------------+
+# | set volume name from template |
+# +-------------------------------+
+volname=`setvolname "$voltmpl" $sourcedir`
+
+
+# +-------------------------------------------------------------------+
+# | print new header for confirmation summary (interactive mode only) |
+# +-------------------------------------------------------------------+
+if [ $interactive -ne 0 ]; then
+  cat << %
+
+ $makcd - Final Verification of Archival Settings
+-------------------------------------------------------------------------------
+Command version:        $makcd $version ($revdate)
+%
+fi
+
+
+# +---------------------------------------------------------+
+# | print "-query" summary - interface for calling programs |
+# +---------------------------------------------------------+
+if [ $skip -eq 0 ]; then
+  skipflag=NO
+else
+  skipflag=YES
+fi
+if [ $query -ne 0 ]; then
+  cat << %
+debuglevel              $debug
+sourcedir               $sourcedir
+mode                    $mode
+datelimit               $datelimit
+skip                    $skipflag
+volname                 $volname
+voltemplate             $voltmpl
+followlinks             $follow_links
+maxsize                 $maxsizeMiB
+target                  ${target}.iso
+%
+  if [ $write_cd -ne 0 ]; then
+    cat << %
+copies                  $number
+speed                   $speed
+%
+    if [ $testrun -ne 0 ]; then
+      cat << %
+simulation              ON
+%
+    fi
+  fi
+  cat << %
+log                     $log
+
+%
+  rm -f $xlist $xlist.* $flist $flist.* $timestampfile
+  exit
+fi
+
+
+
+# +=================================================+
+# | FEEDBACK / CONFIRMATION / CHECK BEFORE STARTING |
+# +=================================================+
+cat << %
+Source / archive directory:     $sourcedir
+Number of directory entries:    $entries
+Maximum archive size:           $maxsizeMiB MiB ($maxsizeKiB KiB)
+%
+if [ $mode = recent ]; then
+  $echo "If insufficient media capacity: -> most RECENT files are archived"
+elif [ $mode = down ]; then
+  $echo "If multiple media are required, recent files are archived first"
+elif [ $mode = up ]; then
+  $echo "If multiple media are required, the oldest files are archived first"
+else
+  $echo "If insufficient media capacity: -> OLDEST files are archived"
+fi
+$echo "File date / age restriction:    \c"
+decode_date -show $inlimit
+if [ $skip -eq 1 ]; then
+  $echo "Oversize subdirectories:        skipped"
+elif [ $confirm -eq 1 ]; then
+  $echo "Oversize subdirectories:        prompt user"
+else
+  $echo "Oversize subdirectories:        abort archiving"
+fi
+if [ x$follow_links = x ]; then
+  $echo "Handling of symbolic links:     archived as links"
+else
+  $echo "Handling of symbolic links:     replaced by link target"
+fi
+$echo "Archive list / log:"
+$echo "        $log"
+if [ $write_cd -ne 0 ]; then
+  if [ x$device != x ]; then
+    $echo "Archiving device:               $target"
+  else
+    $echo "Archiving device:               default device with \"cdrw\""
+  fi
+  $echo "                                archiving directly to CD-R/RW"
+  if [ $speed -gt 0 ]; then
+    $echo "Drive speed for archiving:      ${speed}x"
+  else
+    $echo "Drive speed for archiving:      default drive speed"
+  fi
+  $echo "Number of archival copies:      $number"
+  if [ $testrun -ne 0 ]; then
+    $echo "Simulation mode:                ON (NO DATA WRITTEN TO MEDIA)"
+  else
+    $echo "Simulation mode:                OFF (data written to media)"
+  fi
+else
+  $echo "ISO9660 archive (target):"
+  $echo "        ${target}.iso"
+  if [ $mode = down -o $mode = up ]; then
+    $echo "  If multiple volumes are needed, the volume files will be named"
+    $echo "        ${target}_##.iso"
+    $echo "  where \"##\" is a two-digit volume number."
+  fi
+fi
+$echo "ISO9660 volume name:            $volname"
+if [ $debug -gt 1 ]; then
+  $echo "Debug / output level:           verbose / debugging"
+elif [ $debug -gt 0 ]; then
+  $echo "Debug / output level:           debugging"
+fi
+if [ $mkisofs = old ]; then
+  cat << %
+Compatibility note / warning:
+        The installed version of "mkisofs" has limitations in partial
+        archiving (number of files that can be excluded); if the source
+        directory has a large number of subfiles and their size exceeds
+        the capacity by a large amount, partial archiving may not be
+        possible, and "$makcd" will abort.
+%
+fi
+if [ $debug -ne 0 ]; then
+  cat << %
+NOTE: The "mkisofs" command that is used for creating the ISO9660 disk
+image will issue messages reading
+        Warning: creating filesystem that does not conform to ISO-9660
+These warnings can be ignored - they are the result of using the
+Rockridge and Joliet extensions, as well as certain required options,
+in order
+ - to maintain UNIX compatibility,
+ - to allow for long filenames
+ - to suppress version numbers
+ - to allow for certain characters that are commonly used for UNIX files,
+ - to trailing dots, which would prevent VnmrJ / VNMR from reading data
+   off the CD-ROM.
+
+%
+fi
+if [ $print -eq 1 ];then
+  cat << %
+
+The above settings may be given by built-in defaults, which can be altered
+through a configuration file "/vnmr/app-defaults/$makcd" or/and (if present)
+"~/app-defaults/$makcd"; if both files are present, settings in the local
+file override those in "/vnmr/app-defaults/$makcd". Apart from that, all
+settings can be altered via command line arguments (see below).
+
+%
+  rm -f $xlist $xlist.* $flist $flist.* $timestampfile
+  printhelp
+elif [ $confirm -eq 1 ]; then
+  $echo
+  if [ $write_cd -eq 0 ]; then
+    $echo "   ==> OK to proceed (y|n) [y]? \c"
+  elif [ $testrun -ne 0 ]; then
+    $echo "   ==> OK to proceed (y|n) [y]? \c"
+  else
+    cat << %
+You now have the following options:
+        a: abort
+        b: proceed with burning
+        t: test the burning process (simulation run)
+%
+    $echo "   ==> make your selection (a|b|t) [b]? \c"
+  fi
+  read ans
+  if [ `$echo $ans | egrep -ic 'a|n'` -gt 0 ]; then
+    $echo "   aborting."
+    $echo
+    rm -f $xlist $xlist.* $flist $flist.* $timestampfile
+    exit
+  elif [ `$echo $ans | grep -ic 't'` -gt 0 ]; then
+    $echo
+    $echo "Doing test / simulation run only; data will be transferred,"
+    $echo "   but no media will be burnt."
+    testrun=1
+  fi
+fi
+$echo
+$echo
+
+
+
+
+# +================================+
+# | ############################## |
+# | PROCESSING SECTION STARTS HERE |
+# | ############################## |
+# +================================+
+
+
+# +-------------------------------------------+
+# | Calculate maximum available space on CD-R |
+# +-------------------------------------------+
+cdspace=`$echo $maxsizeKiB | \
+    $awk '{printf("%1.0f\n",$1/('$ISOMARGIN'*'$SAFETYMARGIN'))}'`
+isomargin=`$echo $ISOMARGIN | $awk '{printf("%3.1f\n",($1-1)*100)}'`
+safetymargin=`$echo $SAFETYMARGIN | $awk '{printf("%3.1f\n",($1-1)*100)}'`
+
+
+# +---------------------------------------------+
+# | check size of source directory source files |
+# +---------------------------------------------+
+$echo "Checking space consumption of source directory subfiles;"
+$echo "   with large amounts of data this may take a while ... "
+cd $sourcedir
+totalsubfiles=`ls -1d * | wc -l | $awk '{print $1}'`
+if [ x$follow_links = x-f ]; then
+  du="du -skL"
+else
+  du="du -sk"
+fi
+if [ "x$datelimit" = xnone ]; then
+  if [ $mode = recent -o $mode = down ]; then
+    ls -td ./* | xargs $du > $tmpfile 2>&1
+  else
+    ls -trd ./* | xargs $du > $tmpfile 2>&1
+  fi
+else
+  if [ `$echo $datelimit | grep -c '^[-+]'` -eq 1 ]; then
+    find ./* -prune \! -mtime $datelimit > $tmpfile.excluded
+    if [ $mode = recent -o $mode = down ]; then
+      (ls -td `find ./* -prune -mtime $datelimit` /dev/null | \
+              grep -v /dev/null | xargs $du) > $tmpfile 2>&1
+    else
+      (ls -trd `find ./* -prune -mtime $datelimit` /dev/null | \
+              grep -v /dev/null | xargs $du) > $tmpfile 2>&1
+    fi
+  elif [ $mode = up -o $mode = old ]; then
+    touch -t ${datelimit}2359 $timestampfile
+    find ./* -prune -newer $timestampfile > $tmpfile.excluded
+    (ls -trd `find ./* -prune \! -newer $timestampfile` /dev/null | \
+              grep -v /dev/null | xargs $du) > $tmpfile 2>&1
+  else
+    touch -t ${datelimit}0000 $timestampfile
+    find ./* -prune \! -newer $timestampfile > $tmpfile.excluded
+    (ls -td `find ./* -prune -newer $timestampfile` /dev/null | \
+              grep -v /dev/null | xargs $du) > $tmpfile 2>&1
+  fi
+fi
+if [ x$follow_links = x-f -a \
+     `cat $tmpfile | grep -c '^du: [ ]*failed for '` -gt 0 ]; then
+  cat $tmpfile | grep '^du: [ ]*failed for ' | sed 's/^du: [ ]*failed for //
+s/: [ ]*Cycle detected$//
+s/^.\///' > $tmpfile.failed
+  cat $tmpfile | grep -v '^du: [ ]*failed for ' > $tmpfile.1
+  mv $tmpfile.1 $tmpfile
+fi
+if [ -s $tmpfile.failed ]; then
+  failedfiles=`cat $tmpfile.failed | wc -l | $awk '{print $1}'`
+else
+  failedfiles=0
+  rm -f $tmpfile.failed
+fi
+
+
+# +--------------------------------------------+
+# | scan directory for oversize subdirectories |
+# +--------------------------------------------+
+touch $tmpfile.oversize
+cat $tmpfile | $awk 'BEGIN {
+  limit='$cdspace'
+  oversizefiles="'$tmpfile.oversize'"
+  xlist="'$xlist'"
+}
+{
+  if ($1 > limit)
+  {
+    printf("%s (%d KiB / %3.1f MiB)\n",
+        substr($2,3,length($2)-2), $1, $1/1024) >> oversizefiles
+    print $2 >> xlist
+  }
+  else
+    print
+}' > $tmpfile.1
+mv $tmpfile.1 $tmpfile
+nfiles=`cat $tmpfile | wc -l | $awk '{print $1}'`
+if [ -s $tmpfile.excluded ]; then
+  cat $tmpfile.excluded >> $xlist
+fi
+rm -f $tmpfile.excluded
+
+
+# +------------------------------------------------------------+
+# | interception point for the case of oversize subdirectories |
+# +------------------------------------------------------------+
+if [ -s $tmpfile.oversize ]; then
+  if [ $skip -eq 0 ]; then
+    abort=0
+    if [ $confirm -eq 1 ]; then
+      if [ `wc -l < $tmpfile.oversize` -gt 1 ]; then
+        cat << %
+The following subdirectories exceed the capacity of the archival media:
+%
+      else
+        cat << %
+The following subdirectory exceeds the capacity of the archival media:
+%
+      fi
+      cat $tmpfile.oversize | sed 's/^/   /'
+      $echo "   ==> Do you want to abort the archiving (y|n) [y]? \c"
+      read ans
+      if [ `$echo $ans | grep -ic n` -eq 0 ]; then
+        abort=1
+      else
+        cat << %
+The above oversize subdirectory (or subdirectories) will NOT be archived."
+%
+      fi
+    else
+      abort=1
+    fi
+    if [ $abort -eq 1 ]; then
+      cat << %
+Rearrange the above data into smaller subdirectories and try again!
+
+   command aborted.
+
+%
+      rm -f $tmpfile.oversize
+      rm -f $tmpfile $tmpfile.1 $tmpfile.failed
+      rm -f $xlist $xlist.* $flist $flist.* $timestampfile
+      exit
+    fi
+  else
+    if [ `wc -l < $tmpfile.oversize` -gt 1 ]; then
+      cat << %
+The following subdirectories exceed the capacity of the archival media
+and will NOT be archived:
+%
+    else
+      cat << %
+The following subdirectory exceeds the capacity of the archival media
+and will NOT be archived:
+%
+    fi
+    cat $tmpfile.oversize | sed 's/^/   /'
+    $echo
+  fi
+else
+  rm -f $tmpfile.oversize
+fi
+
+
+
+# +=====================================+
+# | PRINT HEADER FOR ARCHIVING LOG FILE |
+# +=====================================+
+cat > $log << %
+
+ $makcd - Data Archival Log
+===============================================================================
+Host:                   $host
+User:                   $me
+Date / time:            $timestamp
+Command version:        $makcd $version ($revdate)
+-------------------------------------------------------------------------------
+Debug / output level:   $debug
+Source directory:       $sourcedir
+Volume name:            $volname
+   Template string:        $voltmpl
+%
+if [ $skip -eq 1 ]; then
+  $echo "Oversize subdirs:       skipped" >> $log
+elif [ $confirm -eq 1 ]; then
+  $echo "Oversize subdirs:       prompt user" >> $log
+else
+  $echo "Oversize subdirs:       abort archiving" >> $log
+fi
+$echo "Symbolic links:         \c" >> $log
+if [ x$follow_links = x-f ]; then
+  $echo "followed (-> link targets are archived)" >> $log
+else
+  $echo "NOT followed (-> link targets NOT archived)" >> $log
+fi
+
+cat >> $log << %
+Nominal media capacity: $maxsizeMiB MiB ($maxsizeKiB KiB)
+Usable media capacity:  $cdspace KiB
+   ISO9660 margin:         $isomargin % (estd.)
+   Safety margin:          $safetymargin %
+%
+
+if [ $mode = old ]; then
+  cat >> $log << %
+Archival mode:          If the media capacity is insufficient, only
+                        the OLDEST data / subdirectories are archived.
+%
+elif [ $mode = recent ]; then
+  cat >> $log << %
+Archival mode:          If the media capacity is insufficient, only the
+                        most recent data / subdirectories are archived.
+%
+elif [ $mode = down ]; then
+  cat >> $log << %
+Archival mode:          Archiving in reverse chronological order (most recent
+                        files first) - on multiple volumes, if necessary.
+%
+elif [ $mode = up ]; then
+  cat >> $log << %
+Archival mode:          Archiving data in chronological order (oldest files
+                        files first) - on multiple volumes, if necessary.
+%
+fi
+
+if [ $write_cd -eq 0 ]; then
+  cat >> $log << %
+ISO9660 target file:    ${target}.iso
+%
+  if [ $mode = down -o $mode = up ]; then
+    cat >> $log << %
+  With multi-volume archives the volume files will be named
+                        ${target}_##.iso
+%
+  fi
+  cat >> $log << %
+-------------------------------------------------------------------------------
+%
+else
+  if [ $target = /dev/cdrw ]; then
+    cat >> $log << %
+Archiving device:       default device with $cdcmd
+%
+  else
+    cat >> $log << %
+Archiving device:       $target
+%
+  fi
+  cat >> $log << %
+Number of copies:       $number
+Writing speed:          ${speed}x
+-------------------------------------------------------------------------------
+%
+fi
+
+cat >> $log << %
+Results of Source Directory Analysis:
+  Total subfiles / directories:         $totalsubfiles
+%
+if [ $failedfiles -gt 0 ]; then
+  $echo "  Rejected items:                       $failedfiles \c" >> $log
+  $echo "(recursive symbolic link)" >> $log
+fi
+if [ -s $tmpfile.oversize ]; then
+  cat >> $log << %
+===============================================================================
+Subdirectories excluded because they exceed the media capacity:
+---------------------------------------------------------------
+%
+  cat $tmpfile.oversize | sed 's/^/  /' >> $log
+fi
+if [ $failedfiles -gt 0 ]; then
+  cat >> $log << %
+===============================================================================
+Subfiles / subdirectories rejected due to recursive links:
+----------------------------------------------------------
+%
+  ls -Cd `cat $tmpfile.failed` | sed 's/^/  /' >> $log
+fi
+
+
+
+# +=============================+
+# | PRODUCE ARCHIVAL FILE LISTS |
+# +=============================+
+($echo $cdspace; cat $tmpfile) | $awk 'BEGIN {
+  getline
+  space=$1
+  sum=0
+  archive=1
+  volume=0
+  flist="'$flist'"
+  volname=sprintf("%s.%02d", flist, volume)
+}
+{
+  if ((sum + $1) > space)
+  {
+    sum=0
+    volume++
+    volname=sprintf("%s.%02d", flist, volume)
+  }
+  sum += $1
+  print $2 >> volname
+}'
+
+
+# +---------------------------------------+
+# | build volume file and exclusion lists |
+# +---------------------------------------+
+if [ $mode = old -o $mode = recent ]; then
+  if [ `ls $flist.* | wc -l` -gt 1 ]; then
+    cp $xlist $xlist.00
+    cat `ls $flist.* | grep -v $flist.00` >> $xlist.00
+    rm -f `ls $flist.* | grep -v $flist.00`
+    cp $xlist.00 $xlist
+    cp $flist.00 $flist
+  else
+    cp $xlist $xlist.00
+    cp $flist.00 $flist
+  fi
+  vols=1
+else
+  if [ `ls $flist.* | wc -l` -gt 1 ]; then
+    vols=0
+    for f in $flist.*; do
+      ext=`$echo $f | $awk '{print substr($1,length($1)-1,2)}'`
+      cp $xlist $xlist.$ext
+      cat `ls $flist.* | grep -v $f` >> $xlist.$ext
+      vols=`expr $vols + 1`
+    done
+  else
+    cp $xlist $xlist.00
+    cp $flist.00 $flist
+    vols=1
+  fi
+fi
+
+
+# +------------------------------------------------+
+# | verify exclusion capacity (old "mkisofs" only) |
+# +------------------------------------------------+
+if [ $mkisofs = old -a `ls $xlist.* | wc -l` -gt 0 ]; then
+  for f in $xlist.*; do
+    if [ -s $f ]; then
+      excluded=`cat $f | wc -l | $awk '{print $1}'`
+      if [ $excluded -gt 0 ]; then
+        xlines=`cat $f | sed 's/^/-m /' | xargs | wc -l`
+        xchars=`cat $f | sed 's/^/-m /' | xargs | wc -c`
+        MAXCHARS=1900
+        if [ $xlines -gt 1 -o $xchars -gt $MAXCHARS ]; then
+          cat << %
+The installed version of "mkisofs" can only exclude a limited number of
+files in the archiving:
+ - the amount of data in specified source directory exceed the media
+   capacity by a large amount, and
+ - consequently, the number of files to be excluded from the archiving
+   is too big for this version of "mkisofs".
+You need to move some data out of the archive directory temporarily,
+or reorganize the data in the source directory, such that there are either
+fewer entries in the source directory, and / or you can archive just a
+subdirectory instead all of the source directory at once.
+
+   command aborted.
+
+%
+          rm -f $tmpfile $tmpfile.1 $tmpfile.failed $tmpfile.oversize
+          rm -f $xlist $xlist.* $flist $flist.* $timestampfile
+          exit
+        fi
+      fi
+    fi
+  done
+fi
+
+
+
+
+# +=================================+
+# | ############################### |
+# |      NOW DO THE ARCHIVING       |
+# | ############################### |
+# | Loop over volumes, if necessary |
+# +=================================+
+freespaceOK=1
+failed=0
+vol_index=0
+vols_done=0
+for xf in $xlist.*; do
+  vol_index=`expr $vol_index + 1`
+  ext=`$echo $xf | $awk '{print substr($1,length($1)-1,2)}'`
+  fl=${flist}.${ext}
+  excluded=`cat $xf | wc -l | $awk '{print $1}'`
+  archived=`cat $fl | wc -l | $awk '{print $1}'`
+  if [ $write_cd -eq 1 ]; then
+    cat >> $log << %
+
+###############################################################################
+%
+    if [ $vols -gt 1 ]; then
+      $echo "  ARCHIVING VOLUME $vol_index\c" >> $log
+    else
+      $echo "  ARCHIVING ONE VOLUME\c" >> $log
+    fi
+    if [ $copies -gt 1 ]; then
+      $echo " ($copies archival copies):" >> $log
+    else
+      $echo " (1 archival copy):" >> $log
+    fi
+  elif [ $freespaceOK -eq 1 ]; then
+    cat >> $log << %
+
+###############################################################################
+%
+    if [ $vols -gt 1 ]; then
+      tgt=${target}_${ext}.iso
+      $echo "  ARCHIVING VOLUME $vol_index:" >> $log
+    else
+      tgt=${target}.iso
+      $echo "  ARCHIVING ONE VOLUME:" >> $log
+    fi
+    $echo "  ISO9660 target file: $tgt" >> $log
+  fi
+
+
+  # +----------------------------+
+  # | build mkisofs option lists |
+  # +----------------------------+
+  if [ $freespaceOK -eq 1 ]; then
+    if [ $mkisofs = new ]; then
+      mkisofs_opt="-D $follow_links -J -r -U"
+      if [ $nobak -eq 1 ]; then
+        mkisofs_opt="$mkisofs_opt -no-bak"
+      fi
+      if [ $debug -eq 1 ]; then
+        mkisofs_opt="$mkisofs_opt -v"
+      fi
+      mkisofs_opt="$mkisofs_opt -V $volname -m core"
+      if [ $mode = up -o $mode = down ]; then
+        mkisofs_opt="$mkisofs_opt -volset-size $vols -volset-seqno $vol_index"
+      fi
+      if [ $excluded -gt 0 ]; then
+        mkisofs_opt="$mkisofs_opt -exclude-list $xf"
+      fi
+    else
+      mkisofs_opt="-d -D"
+      if [ $nobak -eq 0 ]; then
+        mkisofs_opt="-a $mkisofs_opt"
+      fi
+      if [ x$follow_links = "x-f" ]; then
+        mkisofs_opt="$mkisofs_opt -f"
+      fi
+      mkisofs_opt="$mkisofs_opt -J -l -L -N -r"
+      if [ $debug -gt 1 ]; then
+        mkisofs_opt="$mkisofs_opt -v"
+      fi
+      if [ $mode = up -o $mode = down ]; then
+        mkisofs_opt="$mkisofs_opt -volset-size $vols -volset-seqno $vol_index"
+      fi
+      mkisofs_opt="$mkisofs_opt -V $volname -m core"
+      if [ $excluded -gt 0 ]; then
+        mkisofs_opt2=`cat $xf | sed 's/^/-m /' | xargs`
+      fi
+      mkisofs_opt="$mkisofs_opt $mkisofs_opt2"
+    fi
+
+    cat >> $log << %
+###############################################################################
+Subfiles / subdirectories selected for archival:
+------------------------------------------------
+%
+    $echo "Items selected for archival:   \c"
+    $echo $archived | $awk '{printf("%3d subdirectories/files\n",$1)}'
+    ls -Cd `cat $fl | sed 's/^\.\///'` | sed 's/^/  /' >> $log
+    if [ $excluded -gt 0 -a \( $mode = down -o $mode = up \) ]; then
+      $echo "Rejected for this volume:      \c"
+      $echo $excluded | $awk '{printf("%3d subdirectories/files\n",$1)}'
+    fi
+    cat >> $log << %
+===============================================================================
+%
+  fi
+
+
+
+  # +=================================================+
+  # | NOW CREATE ISO IMAGE OR WRITE CD-R ARCHIVE DISK |
+  # +=================================================+
+  if [ $write_cd -eq 1 ]; then
+
+    # +---------------------------------------------+
+    # | in confirm mode, prompt for blank CD-R disk |
+    # +---------------------------------------------+
+    if [ $confirm -eq 1 -o $vols -gt 1 -o $copies -gt 1 ]; then
+      $echo "Make sure a new, blank CD-R disk is in the drive;"
+      $echo "   ==> type <Return> when ready: \c"
+      read ans
+    fi
+
+    # +------------------------------------------------+
+    # | Put together arguments for "cdrw" / "cdrecord" |
+    # +------------------------------------------------+
+    # Solaris 9 / cdrw
+    if [ $cdcmd = cdrw ]; then
+      if [ x$device != x ]; then
+        cdrwargs="-i -d $device"
+      else
+        cdrwargs="-i"
+      fi
+      if [ $speed -gt 0 ]; then
+        if [ "x$cdrwargs" != "x" ]; then
+          cdrwargs="$cdrwargs -p $speed"
+        else
+          cdrwargs="-p $speed"
+        fi
+      fi
+      if [ $testrun -ne 0 ]; then
+        if [ "x$cdrwargs" != "x" ]; then
+          cdrwargs="$cdrwargs -S"
+        else
+          cdrwargs="-S"
+        fi
+      fi
+
+    # Solaris 8 / cdrecord
+    elif [ $sol -eq 1 ]; then
+      if [ x$device != x ]; then
+        cdrwargs="dev=$device"
+      else
+        cdrwargs=""
+      fi
+      if [ $speed -gt 0 ]; then
+        if [ "x$cdrwargs" != "x" ]; then
+          cdrwargs="speed=$speed $cdrwargs"
+        else
+          cdrwargs="speed=$speed"
+        fi
+      fi
+      if [ $testrun -ne 0 ]; then
+        if [ "x$cdrwargs" != "x" ]; then
+          cdrwargs="-dummy $cdrwargs"
+        else
+          cdrwargs="-dummy"
+        fi
+      fi
+      if [ "x$cdrwargs" != "x" ]; then
+        cdrwargs="$cdrwargs -"
+      else
+        cdrwargs="-"
+      fi
+
+    # Linux / cdrecord
+    else
+      cdr=`which cdrecord`
+
+      # look for version with "--" args
+      if [ `strings $cdr | grep -c '\--version'` -gt 0 ]; then
+        if [ x$device != x ]; then
+          cdrwargs="dev=$device"
+        else
+          cdrwargs=""
+        fi
+        if [ $speed -gt 0 ]; then
+          if [ "$cdrwargs" != "" ]; then
+            cdrwargs="--speed=$speed $cdrwargs"
+          else
+            cdrwargs="--speed=$speed"
+          fi
+        fi
+        if [ $testrun -ne 0 ]; then
+          if [ "x$cdrwargs" != "x" ]; then
+            cdrwargs="--dummy $cdrwargs"
+          else
+            cdrwargs="--dummy"
+          fi
+        fi
+
+      # version similar to / same as Solaris one ...
+      else
+        if [ x$device != x ]; then
+          cdrwargs="dev=$device"
+        else
+          cdrwargs=""
+        fi
+        if [ $speed -gt 0 ]; then
+          if [ "x$cdrwargs" != "x" ]; then
+            cdrwargs="speed=$speed $cdrwargs"
+          else
+            cdrwargs="speed=$speed"
+          fi
+        fi
+        if [ $testrun -ne 0 ]; then
+          if [ "x$cdrwargs" != "x" ]; then
+            cdrwargs="-dummy $cdrwargs"
+          else
+            cdrwargs="-dummy"
+          fi
+        fi
+        if [ "x$cdrwargs" != "x" ]; then
+          cdrwargs="$cdrwargs -"
+        else
+          cdrwargs="-"
+        fi
+      fi
+    fi
+    cdcmd="$cdcmd $cdrwargs"
+
+    # +---------------------------------------+
+    # | write archival commands into log file |
+    # +---------------------------------------+
+    $echo "Command Used to Create ISO9660 File System:" >> $log
+    $echo "mkisofs $mkisofs_opt ." | fmt -s -w 68 | $awk 'BEGIN {
+      getline
+      printf("  %s\n", $0)
+    }
+    {
+      printf("        %s\n",$0)
+    }' | fmt -c -w 76 | $awk  'BEGIN {
+      getline
+      printf("%s", $0)
+    }
+    {
+      printf(" \\\n")
+      printf("%s",$0)
+    }
+    END { printf("\n")}' >> $log
+    $echo "Command Used to Write to Archival Media" >> $log
+    $echo "  $cdcmd" >> $log
+    cat >> $log << %
+===============================================================================
+Output Created by Archiving Commands:
+-------------------------------------
+%
+
+    # +----------------------------+
+    # | loop over number of copies |
+    # +----------------------------+
+    failed=1
+    first=1
+    while [ $number -ge 1 ]; do
+      if [ $entries -ne $archived ]; then
+        $echo "Writing ISO9660 CD-R with $archived out of $entries entries ... "
+      else
+        $echo "Writing ISO9660 CD-R with $entries entries ... "
+      fi
+
+      # +-------------------------------------+
+      # | write ISO9660 CD-R archive disk;    |
+      # | logging active during 1st pass only |
+      # +-------------------------------------+
+      if [ $first -eq 1 ]; then
+        # +---------------------------------------------------+
+        # | currently we make no distinction based on "debug" |
+        # +---------------------------------------------------+
+        if [ $debug -gt 1 ]; then
+          ( mkisofs $mkisofs_opt . | $cdcmd ) 2>&1 | tee -a $log
+        else
+          ( mkisofs $mkisofs_opt . | $cdcmd ) 2>&1 | tee -a $log
+          # ( mkisofs $mkisofs_opt . 2>/dev/null | $cdcmd ) 2>&1 | tee -a $log
+        fi
+      else
+        # +---------------------------------------------------+
+        # | currently we make no distinction based on "debug" |
+        # +---------------------------------------------------+
+        if [ $debug -gt 1 ]; then
+          mkisofs $mkisofs_opt . | $cdcmd
+        else
+          mkisofs $mkisofs_opt . | $cdcmd
+          # mkisofs $mkisofs_opt . 2>/dev/null | $cdcmd
+        fi
+      fi
+      if [ $? -eq 0 ]; then
+        failed=0
+      fi
+      number=`expr $number - 1`
+
+      # +----------------------+
+      # | prompt for new media |
+      # +----------------------+
+      if [ x$device != x ]; then
+        eject $device
+      else
+        eject
+      fi
+      if [ $number -gt 0 ]; then
+        $echo "Eject recordable disk (if necessary) and insert a new, blank one;"
+        $echo "   ==> type <Return> when ready: \c"
+        read ans
+      fi
+      first=0
+    done
+    if [ $failed -eq 1 ]; then
+      $echo "ARCHIVING FAILED - DATA NOT WRITTEN TO ARCHIVAL MEDIA!"
+    fi
+  elif [ $freespaceOK -eq 1 ]; then
+
+    # +--------------------------------------------+
+    # | check for free space in target file system |
+    # +--------------------------------------------+
+    $echo "Free space in target file system \"$targetdir\":" | tee -a $log
+    tfreeKiB=`df -k $targetdir | $tail -n 1 | $awk '{print $4}'`
+    $echo $tfreeKiB | \
+    	$awk '{printf("        %d KiB (%3.1f MiB)\n",$1,$1/1024)}' | \
+	tee -a $log
+    if [ $maxsizeKiB -gt $tfreeKiB ]; then
+      $echo | tee -a $log
+      $echo "NOT ENOUGH SPACE TO CREATE ISO9660 ARCHIVE!" | tee -a $log
+      $echo | tee -a $log
+      freespaceOK=0
+      failed=1
+    else
+
+      # +--------------------------------------+
+      # | write archival command into log file |
+      # +--------------------------------------+
+      $echo "Command Used to Create ISO9660 File System:" >> $log
+      $echo "mkisofs $mkisofs_opt -o $tgt ." | fmt -s -w 68 | $awk 'BEGIN {
+        getline
+        printf("  %s\n", $0)
+      }
+      {
+        printf("        %s\n",$0)
+      }' | fmt -c -w 76 | $awk  'BEGIN {
+        getline
+        printf("%s", $0)
+      }
+      {
+        printf(" \\\n")
+        printf("%s",$0)
+      }
+      END { printf("\n")}' >> $log
+      cat >> $log << %
+===============================================================================
+Output Created by Archiving Command:
+------------------------------------
+%
+
+      # +---------------------------------------+
+      # | Create ISO9660 disk image on harddisk |
+      # +---------------------------------------+
+      if [ $entries -ne $archived ]; then
+        $echo "Writing ISO9660 archive with $archived out of $entries entries ... "
+      else
+        $echo "Writing ISO9660 archive with $entries entries ... "
+      fi
+      failed=1
+      # +---------------------------------------------------+
+      # | currently we make no distinction based on "debug" |
+      # +---------------------------------------------------+
+      if [ $debug -gt 0 ]; then
+        mkisofs $mkisofs_opt -o $tgt . 2>&1 | tee -a $log
+      else
+        mkisofs $mkisofs_opt -o $tgt . 2>&1 | tee -a $log
+        # mkisofs $mkisofs_opt -o $tgt . 2>/dev/null | tee -a $log
+      fi
+      if [ -s $tgt ]; then
+        failed=0
+      fi
+
+      # +-----------------------------------+
+      # | check for presence of target file |
+      # +-----------------------------------+
+      if [ $failed -ne 0 ]; then
+        $echo "$makcd:  UNABLE TO CREATE ARCHIVE!"
+        if [ $debug -eq 0 ]; then
+          rm -f $tgt
+        else
+          if [ -f $tgt ]; then
+            $echo "Unsuccessful / residual ISO9660 archive (CD disk image):"
+            ls -l $tgt 2>&1 | sed 's/ [ ]*/ /
+s/^/    /'
+          fi
+        fi
+      else
+        $echo "   ... done!"
+        $echo
+        $echo "Resulting ISO9660 archive (CD disk image):" | tee -a $log
+        ls -l $tgt | $awk '{
+	  kb=$5/1024
+	  printf("  %s\n",$NF)
+	  printf("File size: %3.1f KiB / %3.1f MiB\n",kb,kb/1024)
+	}' | tee -a $log
+        $echo "32-bit checksum, as determined by \"cksum\":" | tee -a $log
+        cksum $tgt | expand | sed 's/ [ ]*/ /g
+s/^/  /' | tee -a $log
+        $echo | tee -a $log
+	vols_done=`expr $vols_done + 1`
+      fi
+    fi
+  fi
+done
+
+
+# +-------------------------------------------------+
+# | clean up files, mark end of process in log file |
+# +-------------------------------------------------+
+rm -f $tmpfile $tmpfile.1 $tmpfile.failed $tmpfile.oversize
+rm -f $xlist $xlist.* $flist $flist.* $timestampfile
+if [ $testrun -ne 0 ]; then
+  cat >> $log << %
+
+###############################################################################
+             TEST / SIMULATION RUN ONLY - NO DATA WRITTEN TO MEDIA
+###############################################################################
+
+%
+  mv $log $HOME/${makcd}_testrun.log
+  cat << %
+
+
+Simulation / test run complete - no data written to the archival media.
+The test log file is available as
+        $HOME/${makcd}_testrun.log
+
+%
+elif [ $vols_done -gt 0 -o $failed -eq 0 ]; then
+  cat >> $log << %
+
+###############################################################################
+                            END OF ARCHIVING LOG
+###############################################################################
+
+%
+  if [ $vols_done -gt 0 -a $failed -ne 0 ]; then
+    cat << %
+Archiving completed -
+  ATTENTION: NOT ALL VOLUMES WERE ARCHIVED DUE TO DISK SPACE LIMITATIONS!
+%
+  else
+    $echo "Archiving completed!"
+  fi
+  cat << %
+
+The archiving log is stored as
+        $log
+%
+  if [ $loglink -eq 1 ]; then
+    rm -f $HOME/last_archivelog
+    ln -s $log $HOME/last_archivelog
+    if [ $write_cd -eq 0 ]; then
+      rm -f $targetdir/last_archivelog
+      ln -s $log $targetdir/last_archivelog
+    fi
+    rm -f $logdir/last_archivelog
+    ln -s $log $logdir/last_archivelog
+    cat << %
+The symbolic link
+        last_archivelog -> $log
+makes it easier for you to find the last log file.
+%
+  fi
+
+  $echo
+fi
+
+# +===============+
+# | END OF SCRIPT |
+# +===============+
+
