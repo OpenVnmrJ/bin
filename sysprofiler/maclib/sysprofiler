@@ -1,0 +1,13 @@
+"sysprofiler - macro for using 'bin/sysprofiler' from within VnmrJ / VNMR"
+if $#=0 then
+  shell('sysprofiler')
+else
+  $cmd='shell(\'sysprofiler'
+  $ix=1
+  repeat
+    $cmd=$cmd+' '+${$ix}
+    $ix=1+$ix
+  until $ix>$#
+  $cmd=$cmd+'\')'
+  exec($cmd)
+endif

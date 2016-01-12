@@ -1,0 +1,224 @@
+******************************************************************************
+  sysprofiler  -  Show Computer, OS, & VnmrJ/VNMR Version/Configuration (M)
+******************************************************************************
+
+  Syntax:   sysprofiler
+	    sysprofiler(<'acq'><,'patches'><,'net'><,'printers'>)<,'rec'> \
+			<,'security'><,'users'>)
+	    sysprofiler('all')
+	    sysprofiler('basic')
+	    sysprofiler('version')
+	    sysprofiler('help')
+
+  Description:  Displays system hard- and software configuration, see the
+	        equivalent UNIX utility "sysprofiler".
+
+
+  Arguments:    'acq' adds console / acquisition configuration
+		     information; includes "-n" / "-net" option below.
+		'basic' displays only basic output selection (Linux ONLY); any
+		     other selector argument overrides the 'basic' option.
+		'net' also lists the network configuration, and
+                     (on spectrometer hosts) acquisition communication setup.
+		'patches' also lists installed OS (Linux or Solaris) patches;
+		     OS patches superseded by newer versions are not shown.
+		'printers' or 'plotters' (both Linux ONLY) shows OS and VnmrJ
+		     printer/plotter definitions and queue status.
+  		'rec' or 'recomm' lists recommendations derived from analysis
+		     (all topics).
+  		'security' shows relevant OS security information
+		'users' lists properties of defined VnmrJ / VNMR users and
+		     operators (Linux / VnmrJ ONLY)
+		The above arguments can also be combined (any order).
+	        'all' combines all of the above. NOTE: in Linux, 'all' is the
+		     DEFAULT output selection (for basic / minimum output only
+		     use the 'basic' argument); 'all' overrides all other
+		     selector arguments.
+		Undefined arguments cause "sysprofiler" to abort with help
+		information.
+		'version' reports the command version and date.
+		'help' displays a syntax guide.
+
+  Examples:     Calls from the VnmrJ / VNMR command line, output shown in the
+		text window ("Text Output" from "Process" tab in VnmrJ)
+                   sysprofiler
+	           sysprofiler('all')
+	           sysprofiler('basic')
+	           sysprofiler('acq','users')
+		   sysprofiler('net')
+		   sysprofiler('patches')
+		   sysprofiler('rec')
+		   sysprofiler('help')
+		   sysprofiler('version')
+		Printing output, capturing the output in a file:
+		   printon sysprofiler printoff
+	           printon sysprofiler('all') printoff
+	           printon sysprofiler('all') printoff('file_name')
+
+
+******************************************************************************
+  sysprofiler  -  Show Computer, OS, & VnmrJ/VNMR Version/Configuration (U)
+******************************************************************************
+
+  Syntax:   sysprofiler <-a|--acq> <-n|--net> <-p|--patches> \
+		<--print<ers>|--plot<ter>> <-r|--rec<omm>> <-s|--sec<urity>> \
+                <-u|--users>
+	    sysprofiler <-[anpqrsu]*>
+	    sysprofiler <-b|--basic>
+	    sysprofiler <--all>
+            sysprofiler <-v|--version>
+	    sysprofiler <-h|--help>
+
+  Description:  The "sysprofiler" utility serves several purposes, e.g.:
+                 - For the decision whether one can upgrade a system to the
+		   current version of the operating environment and/or VnmrJ,
+                   reliable system configuration information (such as
+		   workstation type, RAM and disk size, etc.) is essential.
+		 - "sysprofiler" may help tracking down performance issues,
+		   or (especially in Linux) locating configuration issues
+		   (such as missing Linux libraries and patches) that prevent
+		   VnmrJ or related utilities from working properly or at all.
+		 - in Linux, "sysprofiler can also be used to pre-check the
+		   RedHat Enterprise Linux installation (such as a "vanilla"
+		   version of RHEL 5.x) prior to installing VnmrJ, in order to
+		   detect missing packages or libraries that may prevent the
+		   installation or the use of VnmrJ.
+		"sysprofiler" (called in a UNIX shell window) gives
+		comprehensive, formatted output that is easy to read:
+		 - host name and workstation type
+		 - BIOS information (Linux only)
+		 - processor (CPU) speed
+		 - memory (RAM) size
+		 - total size of defined swap areas, virtual memory status
+		 - total available UFS disk space
+		 - size and usage (%) of defined UFS disk partitions
+		 - graphics controller(s), resolution, color depth
+		 - operating system version
+		 - warning if only "End User" option is installed (Solaris)
+		 - number and names of the installed OS patches (only with
+                   "-p" / "--patches" or "--all" argument, see below)
+		 - date and time stamp of latest installed OS patch (only with
+                   "-p" or "--patches" argument, see below)
+		 - networking setup (optional)
+		 - installed / active VnmrJ / VNMR version (with revision date
+		   and spectrometer type selected upon installation)
+		 - VnmrJ / VNMR installation path
+		 - installed VnmrJ software options (VnmrJ only)
+		 - warning if "GNU C" option is not installed
+		 - installed VnmrJ / VNMR patches
+		 - major user library contributions installed in "/vnmr"
+		 - defined VnmrJ / VNMR users
+		 - defined VnmrJ / VNMR printers / plotters & their properties
+		 - list of probe calibrations in "/vnmr/probes"
+		 - shim settings in "/vnmr/shims"
+		 - gradient shim maps
+		 - acquisition networking setup & communication checks
+		   (optional, on spectrometer hosts only)
+		 - (limited) security information
+		 - console hardware information (optional, on VxWorks based
+		   systems only, omitted without "/vnmr/acqqueue/acq.conf")
+		 - recommendations for disk partitioning and upgrading, if
+		   applicable
+		The workstation requirements for our software have been
+		discussed in various issues of Varian MR News; the relevant
+                articles are collected in various FAQ documents that can be
+		accessed via
+		    http://www.varianinc.com/products/nmr/apps/corner.html
+		namely
+		 - "faq/compatibility" ("Host / Workstation and Software
+		   Compatibility") for general compatibility information;
+		 - "faq/linux_install" ("Linux Installation and Setup") for
+		   Linux-specific (pre-)installation and setup information;
+		 - "solaris_install" ("Solaris Installation and Setup") for
+		   Sun/Solaris-specific installation and setup information.
+		With "sysprofiler" and the information in these documents
+                you should be able to assess whether you need to upgrade your
+		workstation for running current software.
+
+		"sysprofiler" will (except for the "-v" / "--version" and the
+		"-h" / "--help" options, of course) write its output into a
+		log file in a directory "~/sysprofiler.logs" (name and full
+		path are given at the bottom of the "sysprofiler" output).
+		Under Linux, this log may (depending on the arguments) include
+		the full list of RPM packages that are installed with the OS.
+
+		The README file includes instructions on how to install and
+		use "sysprofiler" under Linux PRIOR TO installing VnmrJ (as
+		root); in this case, arguments other than "-v" / "--version"
+		and "-h" / "--help" (see below) have no effect. This install
+		option will produce a log file, but the software removes
+		itself from the disk after use (if you want to use it after
+		loading the VnmrJ software, you need to reinstall the
+		"sysprofiler" contribution (preferably as vnmr1). Apart from
+		this special case, "sysprofiler" must (and can) NOT be called
+		as root user.
+
+		Once installed under Linux and in "/vnmr" (by vnmr1, NOT
+		root), "sysprofiler" will start with a dialog that permits
+		updating the module to the latest version WITHOUT reinstalling
+		the contribution.
+
+		Known limitations: Both Ultra 5 and Ultra 10 workstations may
+		be reported as "Sun Ultra 5_10" - they share the same basic
+		hardware architecture. Similarly, Sun Blade 2000 computers may
+		be presented as "Sun Blade 1000" - again because these models
+		share the same basic architecture.
+
+  Arguments:    With the argument syntax below, the use of double dashes
+		("--", Linux standard) is recommended, but currently optional,
+		single dashes (e.g., "-all") work just as well.
+		 - "-a" or "--acq" adds console / acquisition configuration
+		     information; includes "-n" / "--net" option below.
+		 - "-b" ir "--basic" displays only basic output selection
+		     (Linux ONLY); any other selector argument overrides this
+		     option.
+		 - "-n" or "--net" also lists the network configuration, and
+                     (on spectrometer hosts) acquisition communication setup.
+		 - "-p", "--patches" lists OS (Linux, Solaris) and VnmrJ
+		     patches; OS patches superseded by newer versions are not
+		     shown.
+		 - "--pkg", "--packages" (Linux ONLY): same as "--patches"
+		 - "-q", "--printers", or "--plotters" (all under Linux ONLY)
+		     adds OS and VnmrJ printer/plotter definitions and queue
+		     status information
+  		 - "-r", "--rec", or "--recomm" lists recommendations derived
+		     from analysis (all topics); note that no recommendations
+		     are given if the installed version of "sysprofiler" is
+		     older than 1 year.
+  		 - "-s" or "--security" shows relevant OS security information
+		 - "-u" or "--users" lists defined VnmrJ / VNMR users
+		The "-a", "-n", "-p", "-q", "-r", "-s", and "-u" options can
+		be combined, e.g.: "-anq" (in any order).
+	         - "--all" combines all of the above options / output. NOTE:
+		     in Linux, "--all" is the DEFAULT output selection (for
+		     basic / minimum output only use the "-b" or "--basic"
+		     argument); "--all" overrides all other selector arguments.
+		Note: undefined arguments cause "sysprofiler" to abort with
+		help information.
+		 - "-v" or "--version" reports the command version and date.
+		 - "-h" or "--help" displays a syntax guide.
+
+  Examples:     Calls from within a shell window:
+		   sysprofiler
+		   sysprofiler -a
+		   sysprofiler --acq
+		   sysprofiler -a -p
+		   sysprofiler -a -r
+		   sysprofiler -a -p -r
+		   sysprofiler -n
+		   sysprofiler --net
+		   sysprofiler -p
+		   sysprofiler --patches
+		   sysprofiler --net --patches
+                   sysprofiler -r
+                   sysprofiler --rec
+		   sysprofiler -n -p
+		   sysprofiler --all
+		   sysprofiler -u
+		   sysprofiler --users
+		   sysprofiler -v
+		   sysprofiler --version
+		   sysprofiler -h
+		   sysprofiler --help
+		Capturing the output, etc.:
+		   sysprofiler --all | more

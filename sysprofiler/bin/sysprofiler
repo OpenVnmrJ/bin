@@ -1,0 +1,371 @@
+#!/bin/sh
+#
+# sysprofiler - wrapper script to accommodate Solaris and Linux versions
+#               the utility (bin/sysprof.sol, bin/sysprof.lnx)
+
+#---------------------------------
+# version ID / date, command name
+#---------------------------------
+revdate="2010-12-23_01:58"
+#(revdate is maintained by packing script)
+version="2.2.1"
+#(version number maintained by packing script)
+cmd=`basename $0`
+
+#-------------------------------------------------------------------------
+# minimum sysprofiler (wrapper script) version (date) for auto-updating
+# to work with the current Linux module, "sysprof.lnx". This is used by
+# the packing software only and is written into the "SPLinux_info" file
+#-------------------------------------------------------------------------
+update_minversion=2010-01-18
+
+os=`uname -s`
+usernow=`id | tr '()' '  ' | cut -f2 -d' '`
+if [ "$usernow" = root ]; then
+  localbin=/bin
+  logdir=/sysprofiler.logs
+else
+  localbin=$HOME/bin
+  logdir=$HOME/sysprofiler.logs
+fi
+up2date=0
+echo=`which echo`
+pwd=`which pwd`
+abspath=0
+if [ `$echo $os | grep -ci sunos` -eq 1 ]; then
+  util=sysprof.sol
+  os=Solaris
+elif [ `$echo $os | grep -ci linux` -eq 1 ]; then
+  echo="$echo -e"
+  awk=`which awk`
+  utilname=sysprof.lnx
+  if [ -x $localbin/$utilname ]; then
+    util=$localbin/$utilname
+    abspath=1
+  elif [ -x /vnmr/bin/$utilname ]; then
+    util=/vnmr/bin/$utilname
+    abspath=1
+  else
+    util=$utilname
+  fi
+  if [ "$usernow" != root ]; then
+    curver=`grep '^version=' < $util | tr '="' '  ' | $awk '{print $NF}'`
+    currevd=`grep '^revdate=' < $util | tr '="' '  ' | $awk '{print $NF}'`
+    ping=`which ping 2> /dev/null`
+    if [ "$ping" = "" ]; then
+      ping=`whereis -b ping | $awk '{print $NF}'`
+    else
+      ping=/bin/ping
+    fi
+    wget=`which wget 2> /dev/null`
+    if [ "$wget" = "" ]; then
+      pingOK=`$ping -q -c 1 ftp.nmr.varianinc.com 2>/dev/null | \
+              grep -c ' 1 received,'`
+      if [ $pingOK -eq 0 ]; then
+        fmt --width=79  << %
+
+Can't check for on-line updates. Make sure you always use an up-to-date
+version of "bin/sysprofiler"; the current version can be downloaded from the
+on-line User Library at
+%
+      else
+        fmt --width=79  << %
+
+The FTP site for on-line updates appears to be accessible, but the "wget" tool
+is not available on this system; make sure you always use an up-to-date
+version of "bin/sysprofiler"; the current version can be downloaded from the
+on-line User Library at
+%
+      fi
+      cat << %
+          http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+      sleep 1
+    else
+      wd=`$pwd`
+      cmddir=`dirname $0`
+      if [ -w $cmddir -a ! -x $HOME/bin/$utilname ]; then
+        cd $cmddir
+      else
+        if [ ! -d $HOME/bin ]; then
+          mkdir $HOME/bin
+        fi
+        cd $HOME/bin
+        cmddir=`$pwd`
+      fi
+      rm -f SPLinux_info
+      $echo
+      $echo "Trying to download update information ... "
+      $wget -q ftp://ftp.nmr.varianinc.com/outgoing/SPLinux_info
+      if [ ! -s SPLinux_info ]; then
+        pingOK=`$ping -q -c 1 ftp.nmr.varianinc.com 2>/dev/null | \
+                grep -c ' 1 received,'`
+        if [ $pingOK -eq 0 ]; then
+          fmt --width=79  << %
+
+Can't check for on-line updates (FTP server not accessible via "ping" and
+"wget"). This could be due to restrictions with a local firewall.
+%
+        else
+          fmt --width=79  << %
+
+Can't check for on-line updates: the Agilent FTP server is not accessible via
+"wget" (it can be reached via "ping"). This could be due to restrictions with
+a local firewall.
+%
+        fi
+        cat << %
+If Internet access requires using a Web/FTP proxy; you may try calling
+	setenv FTP_PROXY http://proxy_name.domain:port#
+where "proxy_name.domain:port" (e.g.: proxy.mycompany.com:8080") is the proxy
+address that you use for Web / FTP browsing. Such a line can also be added to
+your local "~/.cshrc". Alternatively, you could add a line
+	ftp_proxy=http://proxy_name.domain:port#
+to a local file "~/.wgetrc" or (to cover all users) to "/etc/wgetrc". If all
+of this fails, you can still download the current version from the on-line
+User Library at
+          http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+        $echo " ==> Continue with the installed version of \"sysprofiler\"\c"
+        $echo " (y|n) [y]? \c"
+        read ans
+        if [ `$echo $ans | grep -ic n` -ne 0 ]; then
+          cat << %
+              ... aborting.
+
+%
+          rm -f SPLinux_info sysprof_lnx sysprof_lnx.tmp
+          exit
+        fi
+      else
+        curv=`$echo $revdate | cut -c 3-10 | tr -d '-'`
+        newminv=`head -n 1 < SPLinux_info | tr -d '-' | sed 's/^20//'`
+        if [ "x$newminv" = x -o "$newminv" -gt $curv ]; then
+          cat << %
+
+On-line updating requires a new base version of "bin/sysprofiler" - if you
+want to use the latest "sysprofiler" update, please download the current
+version from the on-line User Library at
+        http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+          sleep 1
+        else
+          newver=`head -n 2 < SPLinux_info | tail -n 1`
+          newrevd=`head -n 3 < SPLinux_info | tail -n 1`
+          req_chksum=`tail -n 1 < SPLinux_info`
+          if [ `($echo $curver; $echo $newver) | \
+                grep -c '^[0-9][0-9]*.[0-9][0-9]*.[0-9][0-9]*$'` -ne 2 ]; then
+            cat << %
+
+Can't compare existing version numbers with version in on-line update -
+   using the pre-installed version of "$utilname".
+In order to use the latest version of "bin/sysprofiler" please download it
+from the on-line User Library at
+        http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+            sleep 1
+          else
+            curvnum=`$echo $curver | tr '.' ' ' | \
+		      $awk '{printf("%d%02d%02d\n",$1,$2,$3)}'`
+            newvnum=`$echo $newver | tr '.' ' ' | \
+		      $awk '{printf("%d%02d%02d\n",$1,$2,$3)}'`
+            if [ $newvnum -le $curvnum ]; then
+              fmt --width=79 << %
+
+The installed version of "sysprofiler" is up-to-date already, i.e., there is
+no need to download a new version: using the pre-installed version of
+"$utilname".
+
+%
+              sleep 1
+            else
+              $echo
+              $echo "The installed Linux-specific \"sysprofiler\" module is"
+              $echo $utilname $curver $currevd | \
+		$awk '{printf("        %s %7s (%s)\n",$1,$2,$3)}'
+              $echo "A newer version"
+              $echo $utilname $newver $newrevd | \
+		$awk '{printf("        %s %7s (%s)\n",$1,$2,$3)}'
+              $echo "is now available."
+              $echo "  ==> OK to download and install (y|n) [y]? \c"
+              read ans
+              $echo
+              if [ `$echo $ans | grep -ic n` -ne 0 ]; then
+                $echo "Using pre-installed version of \"$utilname\"."
+              else
+                rm -f sysprof_lnx
+                $echo "Downloading sysprofiler update (Linux) ... "
+                $wget -q ftp://ftp.nmr.varianinc.com/outgoing/sysprof_lnx
+                if [ -s sysprof_lnx ]; then
+                  $echo "Verifying file identity / integrity ... "
+                fi
+                actual_cksum=`cat sysprof_lnx 2> /dev/null | openssl dgst -md5`
+                if [ ! -s sysprof_lnx ]; then
+                  cat << %
+
+Download from "ftp.nmr.varianinc.com" failed;
+   using the pre-installed version of "$utilname".
+In order to use the latest version of "bin/sysprofiler" please download it
+from the on-line User Library at
+        http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+                  sleep 1
+                elif [ "$actual_cksum" != "$req_chksum" ]; then
+                  cat << %
+
+Checksum error with file downloaded from "ftp.nmr.varianinc.com" -
+   using the pre-installed version of "$utilname".
+In order to use the latest version of "bin/sysprofiler" please download it
+from the on-line User Library at
+        http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+                  sleep 1
+                else
+                  $echo "Verification OK, building / installing module ..."
+                  #cat sysprof_lnx | crypt crypt_key | bunzip2 > sysprof_lnx.tmp
+		  # "crypt" not supported in Linux
+                  if [ `which gzcat 2>&1 | grep -cw no` -eq 0 ]; then
+                    expand=gzcat
+                  else
+                    expand=zcat
+                  fi
+                  $expand sysprof_lnx | bunzip2 > sysprof_lnx.tmp
+		  # the double compression is non-sensical - it's used merely
+		  # to hide the content type from watching gateways ...
+                  if [ ! -s sysprof_lnx.tmp ]; then
+                    cat << %
+
+Unpacking of the utility downloaded from "ftp.nmr.varianinc.com" failed -
+   using the pre-installed version of "$utilname".
+In order to use the latest version of "bin/sysprofiler" please download it
+from the on-line User Library at
+        http://www.chem.agilent.com/en-US/Support/Pages/default.aspx
+
+%
+                    sleep 1
+                  else
+	            mv sysprof_lnx.tmp sysprof.lnx
+                    chmod +x sysprof.lnx
+                    util=`pwd`/sysprof.lnx
+                    $echo "Download successful, using latest module version."
+                    abspath=1
+                    up2date=1
+                  fi
+                fi
+              fi
+            fi
+          fi
+        fi
+      fi
+      rm -f SPLinux_info sysprof_lnx sysprof_lnx.tmp
+      cd $wd
+    fi
+  fi
+else
+  cat << %
+
+$cmd error:  "$os" operating environment not supported,
+   aborting.
+
+%
+  exit
+fi
+if [ $abspath -eq 0 -a \
+     `which $util 2>&1 | grep -ci "no $util in "` -ne 0 ]; then
+  $echo "$cmd error:  executable \"bin/$util\" not found"
+elif [ `$echo "$*" | egrep -ci 'version|-v'` -eq 1 ]; then
+  cat << %
+
+Wrapper script:
+  bin/$cmd version $version ($revdate)
+${os}-specific executable:
+%
+  $util $* | sed 's/^/  bin\//'
+  $echo
+elif [  `$echo "$*" | egrep -ci 'help|-h'` -eq 1 ]; then
+  if [ $up2date -eq 1 ]; then
+    $util --current $*
+  else
+    $util $*
+  fi
+else
+  if [ ! -d $logdir ]; then
+    mkdir $logdir
+  fi
+  logfile=`date "+$logdir/%Y-%m-%d_%Hh%M"`
+  if [ `$echo $util | grep -c sysprof.lnx` -ne 0 ]; then
+    if [ $up2date -eq 1 ]; then
+      util="$util --current"
+    fi
+    ($util --logfile $logfile $* 2>&1 || rm -f $logfile ${logfile}.pkglog) | \
+        tee $logfile
+    if [ -s ${logfile}.pkglog ]; then
+      cat ${logfile}.pkglog >> $logfile 2>&1
+    fi
+    rm -f ${logfile}.pkglog
+  else
+    ($util $* 2>&1 || rm -f $logfile) | tee $logfile
+  fi
+  if [ -s $logfile ]; then
+    sizB=`wc -c < $logfile`
+    sizB=`expr $sizB + 0`
+    sizKiB=`echo $sizB | $awk '{printf("%3.1f\n", $1/1024)}'`
+    cat << %
+
+The complete output of this command is logged:
+        Log file path:  $logfile
+        File size:      $sizB bytes / $sizKiB KiB
+
+%
+  fi
+fi
+$echo
+if [ -w /bin -a -w /bin/sysprofiler ]; then
+  rm -f /bin/sysprofiler /bin/sysprof.??? /bin/eval_netmask
+fi
+
+#==============================================================================
+# REVISION HISTORY (all revisions by rk):
+#------------------------------------------------------------------------------
+# 2007-11-09,       1.0.1:  started
+# 2008-01-04,       1.0.2:  minor amendment for wrapper usage
+# 2008-01-08,       1.0.3:  version printing only with version argument
+# 2008-11-07,       1.0.13: expanded logging for Linux
+# 2009-01-09_21:00, 1.0.14: revision history rearranged
+# 2009-01-17_23:53, 1.0.15
+# 2009-03-24_14:33, 1.1.0:  adapted for use prior to VnmrJ installation
+# 2009-03-24_15:07, 1.1.1:  bug fix for root use
+# 2009-03-24_15:11, 1.1.2:  bug fix
+# 2009-03-24_15:44, 1.1.3:  bug fix
+# 2009-03-27_11:19, 1.1.4:  fixed bug with calls in Solaris
+# 2009-04-03_23:08, 1.2.0:  auto-remove from "/bin" when run as root
+# 2009-04-06_21:24, 1.2.1:  changed to capture error output as well
+# 2009-04-06_22:13, 1.2.2
+# 2009-04-07_00:57, 1.2.3:  bug fix with capturing error output
+# 2010-01-17_20:56, 2.0.0:  new version with auto-updating (Linux only)
+# 2010-01-18_10:27, 2.1.0:  enhanced logic / dialog in auto-updating
+# 2010-01-18_11:26, 2.1.1:  minor amendment in autoupdate dialog output
+# 2010-01-18_13:07, 2.1.2:  minor dialog enhancement
+# 2010-01-18_16:19, 2.1.3:  changed update data packing scheme
+# 2010-01-18_16:49, 2.1.4:  bug fixes
+# 2010-01-18_16:57, 2.1.5:  minor enhancements
+# 2010-01-18_19:30, 2.1.6:  change in date comparison for autoupdate
+# 2010-01-18_19:47, 2.1.7:  dialog enhancements
+# 2010-01-18_20:09, 2.1.8:  bug fixed with unpacking in auto-updating
+# 2010-01-18_20:14, 2.1.9:  minor cosmetics
+# 2010-07-15_09:25, 2.1.10: minor output reformatting
+# 2010-07-27_20:41, 2.1.11: report size of log file
+# 2010-09-17_12:28, 2.1.12: minor output reformatting
+# 2010-09-17_12:36, 2.1.13: avoid use of "uncompress" (may be absent in Linux)
+# 2010-09-17_15:55, 2.1.14: handle "gzcat" vs. "zcat"
+# 2010-09-24_19:40, 2.2.0:  enhanced logic with on-line updating
+# 2010-12-23_01:58, 2.2.1:  corrected Web addresses / URLs
+#==============================================================================
+# END OF SCRIPT
+#==============================================================================

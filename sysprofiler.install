@@ -1,0 +1,250 @@
+#!/bin/sh
+
+#------------------------------------------------------------------------------
+#  Compatibility section
+#------------------------------------------------------------------------------
+
+pwd=`which pwd`
+os=`uname -s`
+echo=`which echo`
+suffix=''
+if [ "$os" = SunOS ]; then
+  awk=nawk
+  suffix=sol
+  xeno=lnx
+elif [ "$os" = Darwin ]; then
+  awk=awk
+  xeno=sol
+# xeno="sol lnx"
+elif [ "$os" = Linux ]; then
+  awk=awk
+  suffix=lnx
+  xeno=sol
+  echo="$echo -e"
+else
+  awk=awk
+fi
+
+#-----------------------------------------------------------------
+# Global variables
+#-----------------------------------------------------------------
+usernow=`id | tr '()' '  ' | cut -f2 -d' '`
+vjcompat_check=0
+sver=""
+sysinstall=0
+vnmrinstall=0
+
+if [ x$vnmrsystem = x ]; then
+  vnmrsystem=/vnmr
+fi
+if [ x$vnmruser = x ]; then
+  vnmruser=$HOME/vnmrsystem
+fi
+
+if [ -f $vnmrsystem/vnmrrev ]; then
+  sver=`head -n 1 < $vnmrsystem/vnmrrev`
+  if [ `$echo $sver | grep -c VERSION` -ne 1 ]; then
+    sver=`grep VERSION < $vnmrsystem/vnmrrev`
+  fi
+fi
+if [ `$echo $sver | grep -c VERSION` -ne 1 ]; then
+  if [ -x $vnmrsystem/bin/Vnmrbg ]; then
+    sver=`strings $vnmrsystem/bin/Vnmrbg | grep VERSION`
+  elif [ -x $vnmrsystem/bin/Vnmr ]; then
+    sver=`strings $vnmrsystem/bin/Vnmr | grep VERSION`
+  else
+    sver=""
+  fi
+fi
+if [ "$sver" = "" ]; then
+  sysinstall=1
+elif [ `$echo $sver | grep -ci "VNMRJ VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ $version$revision"
+  vnmrj=1
+elif [ `$echo $sver | grep -ci "VNMRJ_LX VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ_LX $version$revision"
+  vnmrj=1
+elif [ `$echo $sver | grep -ci "VNMRJ_MAC VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ_MAC $version$revision"
+  vnmrj=1
+else
+  version=`$echo $sver | cut -d ' ' -f2`
+  revision=`$echo $sver | cut -d ' ' -f4`
+  vnmrj=`$echo $version | grep -ci vj`
+  if [ $vnmrj -eq 0 ]; then
+    vnmr_rev="VNMR $version$revision"
+  else
+    vnmr_rev="VnmrJ $version$revision"
+  fi
+fi
+
+#-----------------------------------------------------------------
+# Check VnmrJ / VNMR Version Compatibility
+#-----------------------------------------------------------------
+if [ $sysinstall -eq 0  -a $vjcompat_check -eq 1 ]; then
+  if [ $vnmrj -eq 0 -a \
+       \( "$version" != "6.1" -o "$revision" = "A" \) ]; then
+    $echo "Contribution \"sysprofiler\" is not compatible with $vnmr_rev"
+    $echo "   installation aborted."
+    rm -rf sysprofiler sysprofiler.install sysprofiler.README
+    exit 1
+  else
+    $echo "Installing \"sysprofiler\" contribution for $vnmr_rev ... "
+    $echo "OK to install \"sysprofiler\" under $vnmr_rev (y|n) [n]? \c"
+    read answer
+    if [ x$answer != xy -a x$answer != xY ]; then
+      rm -rf sysprofiler sysprofiler.install sysprofiler.README
+      exit 1
+    fi
+  fi
+fi
+
+#-----------------------------------------------------------------
+# NOW DO THE INSTALLATION
+#-----------------------------------------------------------------
+cd sysprofiler
+if [ "$os" != Linux -o -d /usr/X11R6/include/X11/bitmaps ]; then
+  rm -f bitmaps.tar
+fi
+if [ "$os" = Linux -o "$os" = SunOS ]; then
+  if [ -f source/eval_netmask.c ]; then
+    cc -O -o bin/eval_netmask.new source/eval_netmask.c 2>/dev/null
+    if [ -x bin/eval_netmask.new ]; then
+      mv bin/eval_netmask.new bin/eval_netmask
+      chmod 755 bin/eval_netmask
+      rm -f bin/eval_netmask.*
+    elif [ "$suffix" != "" ]; then
+      if [ -f bin/eval_netmask.$suffix ]; then
+        mv bin/eval_netmask.$suffix bin/eval_netmask
+        rm -f bin/eval_netmask.*
+        chmod 755 bin/eval_netmask
+      fi
+    fi
+  fi
+  if [ "$xeno" != "" ]; then
+    for non_ext in $xeno; do
+      rm -f bin/*.$non_ext
+    done
+  fi
+else
+  rm -f source bin/eval_netmask
+  if [ "$xeno" != "" ]; then
+    for non_ext in $xeno; do
+      rm -f bin/*.$non_ext
+    done
+  fi
+fi
+cd ..
+dir=`$pwd`
+if [ $sysinstall -eq 0 ]; then
+  cd /vnmr
+  vnmrdir=`$pwd`
+  if [ $dir = $vnmrdir ]; then
+    $echo "Installing \"sysprofiler\" in \"/vnmr\" - \c"
+    vnmrinstall=1
+  else
+    $echo "Doing a local \"sysprofiler\" installation - \c"
+    cd $dir
+    cd sysprofiler
+    tar cf - bin | (cd $HOME; tar xfBp -)
+    rm -rf bin
+  fi
+  if [ -d /usr/X11R6/include/X11/bitmaps ]; then
+    if [ -d $HOME/forX11/bitmaps ]; then
+      rm -rf $HOME/forX11/bitmaps
+    fi
+    rmdir $HOME/forX11 2>/dev/null
+    rm -f $dir/sysprofiler/bitmaps.tar
+  fi
+  if [ -f $dir/sysprofiler/bitmaps.tar ]; then
+    if [ -d $HOME/forX11/bitmaps ]; then
+      rm -f $dir/sysprofiler/bitmaps.tar
+    fi
+    if [ \! -d $HOME/forX11 ]; then
+      mkdir $HOME/forX11
+    fi
+    cd $HOME/forX11
+    tar xfBp $dir/sysprofiler/bitmaps.tar
+    rm $dir/sysprofiler/bitmaps.tar
+  fi
+  cd $dir/sysprofiler
+  tar cf - * | (cd ..; tar xfB -)
+  cd ..
+  rm -rf sysprofiler
+  if [ $vnmrinstall -eq 1 ]; then
+    today=`date '+%Y-%m-%d_%H:%M'`
+    if [ -x /vnmr/bin/sysprofiler -a -x $HOME/bin/sysprofiler ]; then
+      mv $HOME/bin/sysprofiler $HOME/bin/sysprofiler.bk.$today
+      $echo "   local executable \"~/bin/sysprofiler\" backed out."
+    fi
+    if [ -x /vnmr/bin/sysprof.$suffix -a -x $HOME/bin/sysprof.$suffix ]; then
+      mv $HOME/bin/sysprof.$suffix $HOME/bin/sysprof.${suffix}.bk.$today
+      $echo "   local executable \"~/bin/sysprof.$suffix\" backed out."
+    fi
+  fi
+elif [ \! -w /bin -a \! -w / ]; then
+  $echo "Must be root to install \"sysprofiler\" prior to installing VnmrJ;"
+  $echo "   installation aborted."
+  rm -rf sysprofiler sysprofiler.install sysprofiler.README
+  exit 1
+else
+  cd $dir/sysprofiler/bin
+  for f in *; do
+    cp $f /bin
+    chmod 755 /bin/$f
+  done
+  if [ -d /usr/X11R6/include/X11/bitmaps ]; then
+    if [ -d $HOME/forX11/bitmaps ]; then
+      rm -rf $HOME/forX11/bitmaps
+    fi
+    rmdir $HOME/forX11 2>/dev/null
+    rm -f $dir/sysprofiler/bitmaps.tar
+  fi
+  if [ -f $dir/sysprofiler/bitmaps.tar ]; then
+    if [ -w /usr/X11R6/include/X11 ]; then
+      cd /usr/X11R6/include/X11
+      tar xfBp $dir/sysprofiler/bitmaps.tar
+      if [ -d $HOME/forX11/bitmaps ]; then
+        rm -rf $HOME/forX11/bitmaps
+      fi
+      rmdir $HOME/forX11 2>/dev/null
+    else
+      if [ ! -d $HOME/forX11 ]; then
+        mkdir $HOME/forX11
+      fi
+      cd $HOME/forX11
+      tar xfBp $dir/sysprofiler/bitmaps.tar
+    fi
+    rm -f $dir/sysprofiler/bitmaps.tar
+  fi
+  cd $dir/sysprofiler
+  rm -r maclib bin
+  cd ..
+  if [ \! -d sysprofiler.logs ]; then
+    mkdir sysprofiler.logs
+  fi
+  cd sysprofiler
+  tar cf - * | (cd ../sysprofiler.logs; tar xf -)
+  cd ..
+  rm -rf sysprofiler
+  mv sysprofiler.README sysprofiler.logs 2>/dev/null
+  if [ $dir != / ]; then
+    tar cf - sysprofiler.logs | (cd /; tar xf -)
+    rm -rf sysprofiler.logs
+  fi
+fi
+$echo "done."
+rm -f sysprofiler.install
+
+#==============================================================================
+# REVISION HISTORY (all revisions by rk):
+#------------------------------------------------------------------------------
+# 2009-07-10: modifications for handling of "/usr/X11R6/include/X11/bitmaps"
+# 2010-07-13: improved handling of non-applicable executables
+# 2010-11-30: deactivate local executables for install in /vnmr
