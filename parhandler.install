@@ -1,0 +1,147 @@
+#!/bin/sh
+
+#------------------------------------------------------------------------------
+#  Compatibility section
+#------------------------------------------------------------------------------
+
+pwd=`which pwd`
+os=`uname -s`
+echo=`which echo`
+if [ "$os" = SunOS ]; then
+  awk=nawk
+elif [ "$os" = Darwin ]; then
+  awk=awk
+elif [ "$os" = Linux ]; then
+  awk=awk
+  echo="$echo -e"
+else
+  awk=awk
+fi
+
+
+#-----------------------------------------------------------------
+# Global variables
+#-----------------------------------------------------------------
+if [ "x$vnmrsystem" = x ]; then
+  vnmrsystem=/vnmr
+fi
+if [ "x$vnmruser" = x ]; then
+  vnmruser=$HOME/vnmrsystem
+fi
+
+sver=""
+if [ -f $vnmrsystem/vnmrrev ]; then
+  sver=`head -n 1 < $vnmrsystem/vnmrrev`
+  if [ `$echo $sver | grep -c VERSION` -ne 1 ]; then
+    sver=`grep VERSION < "$vnmrsystem/vnmrrev"`
+  fi
+fi
+if [ `$echo $sver | grep -c VERSION` -ne 1 ]; then
+  if [ -x $vnmrsystem/bin/Vnmrbg ]; then
+    sver=`strings "$vnmrsystem/bin/Vnmrbg" | grep VERSION`
+  elif [ -x $vnmrsystem/bin/Vnmr ]; then
+    sver=`strings "$vnmrsystem/bin/Vnmr" | grep VERSION`
+  else
+    sver=""
+  fi
+fi
+if [ `$echo $sver | grep -ci "VNMRJ VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ $version$revision"
+  vnmrj=1
+elif [ `$echo $sver | grep -ci "VNMRJ_LX VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ_LX $version$revision"
+  vnmrj=1
+elif [ `$echo $sver | grep -ci "VNMRJ_MAC VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ_MAC $version$revision"
+  vnmrj=1
+else
+  version=`$echo $sver | cut -d ' ' -f2`
+  revision=`$echo $sver | cut -d ' ' -f4`
+  vnmrj=`$echo $version | grep -ci vj`
+  if [ $vnmrj -eq 0 ]; then
+    vnmr_rev="VNMR $version$revision"
+  else
+    vnmr_rev="VnmrJ $version$revision"
+  fi
+fi
+
+#-----------------------------------------------------------------
+# NOW DO THE INSTALLATION
+#-----------------------------------------------------------------
+
+# start by recompiling C programs
+#---------------------------------
+cd parhandler
+$echo "Recompiling C programs:"
+c_modules="import1Dspec jdxfid jdxspec listparam writetrace"
+for f in $c_modules; do
+  if [ -f source/${f}.c ]; then
+    $echo "  compiling ${f}.c ...\c"
+    cc -O -o bin/${f}.new source/${f}.c -m32
+    if [ -x bin/${f}.new ]; then
+      $echo " compilation successful"
+      rm -f bin/$f
+      mv bin/${f}.new bin/$f
+      chmod 755 bin/$f
+    else
+      $echo " recompilation failed, using precompiled module"
+    fi
+  fi
+done
+cd ..
+
+# Now install the files
+#-----------------------
+dir=`$pwd`
+cd /vnmr
+vnmrdir=`$pwd`
+if [ "$dir" = "$vnmrdir" ]; then
+  $echo "Installing \"parhandler\" in \"/vnmr\" -"
+  bintarget=/vnmr/bin
+else
+  $echo "Installing \"parhandler\" in the local directories -"
+  cd $dir
+  cd parhandler
+  tar cf - bin | (cd $HOME; tar xfBp -)
+  rm -rf bin
+  bintarget=$HOME/bin
+fi
+cd $dir
+cd parhandler
+tar cf - * | (cd ..; tar xfB -)
+cd ..
+rm -rf parhandler.install parhandler
+
+# Report versions of binary executables, if possible
+#----------------------------------------------------
+recompile=""
+$echo "Installed versions:"
+usable=0
+for f in $c_modules; do
+  version=`$bintarget/$f -v 2>/dev/null`
+  if [ "$version"  != "" ]; then
+    $echo "        $version"
+    usable=`expr $usable + 1`
+  elif [ "$recompile" != "" ]; then
+    recompile="$recompile $f"
+  else
+    recompile="$f"
+  fi
+done
+if [ "$recompile" != "" ]; then
+  if [ $usable -eq 0 ]; then
+    $echo "        Version information not available (no usable executables)."
+  fi
+  $echo "You MUST recompile the following C programs first:"
+  for f in $recompile; do
+    $echo "        source/${f}.c"
+  done
+  $echo "See these C source file(s) for instructions."
+fi
+$echo ""

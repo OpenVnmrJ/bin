@@ -1,0 +1,54 @@
+"Return binpath "
+"****First check if this is VnmrJ 2.2C or later"
+
+$token1='' $rev='' $subrev=''
+if (rev='') then
+  lookup('file',systemdir+'/vnmrrev','readline',1):rev
+endif
+substr(rev,1):$token1
+format($token1,'upper'):$token1
+if $token1='VNMRJ' then
+  $sw='VnmrJ'
+  substr(rev,3):$rev
+  substr(rev,5):$subrev
+else
+  $sw='VNMR'
+  substr(rev,2):$rev
+  substr(rev,4):$subrev
+endif
+substr($subrev,1,1):$subrev
+
+format($rev,'lower'):$rev2
+$newexists=0
+if ($sw='VnmrJ') then
+   if (($rev2>2.2) or 
+      (($rev2 > 2.15) and 
+       ($subrev<>'A') and 
+       ($subrev<>'B'))) then
+	   $newexists=1
+   endif
+endif
+
+$isok=0 $binpath=''
+if ($newexists) then
+	"For VnmrJ 2.2C or later, use new 'exists'; if"
+	" not found via 'exists', use UNIX path rules."
+   $binpath='' $myhome=''
+   shell('dirname '+userdir):$myhome
+   exists($myhome+'/bin/'+$1,'file'):$isok
+   if ($isok=0) then
+   	exists($1,'bin'):$isok,$binpath
+   else
+	$binpath=$myhome+'/bin/'+$1
+   endif
+endif
+
+if ($isok=0) or ($binpath='') then
+	"use UNIX path rules"
+   $binpath='' $isok=0
+   shell('which',$1,'2>/dev/null'):$binpath
+   if ($binpath<>'') then $isok=1 endif
+endif
+
+return($isok,$binpath)
+   
