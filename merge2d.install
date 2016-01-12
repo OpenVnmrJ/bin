@@ -1,0 +1,115 @@
+#!/bin/sh
+
+#------------------------------------------------------------------------------
+#  Compatibility section
+#------------------------------------------------------------------------------
+
+pwd=`which pwd`
+os=`uname -s`
+echo=`which echo`
+if [ "$os" = SunOS ]; then
+  awk=nawk
+elif [ "$os" = Darwin ]; then
+  awk=awk
+elif [ "$os" = Linux ]; then
+  awk=awk
+  echo="$echo -e"
+else
+  awk=awk
+fi
+
+
+#-----------------------------------------------------------------
+# Global variables
+#-----------------------------------------------------------------
+if [ x$vnmrsystem = x ]; then
+  vnmrsystem=/vnmr
+fi
+if [ x$vnmruser = x ]; then
+  vnmruser=$HOME/vnmrsystem
+fi
+
+sver=""
+if [ -f $vnmrsystem/vnmrrev ]; then
+  sver=`head -n 1 < $vnmrsystem/vnmrrev`
+  if [ `$echo $sver | grep -c VERSION` -ne 1 ]; then
+    sver=`grep VERSION < $vnmrsystem/vnmrrev`
+  fi
+fi
+if [ `$echo $sver | grep -c VERSION` -ne 1 ]; then
+  if [ -x $vnmrsystem/bin/Vnmrbg ]; then
+    sver=`strings $vnmrsystem/bin/Vnmrbg | grep VERSION`
+  elif [ -x $vnmrsystem/bin/Vnmr ]; then
+    sver=`strings $vnmrsystem/bin/Vnmr | grep VERSION`
+  else
+    sver=""
+  fi
+fi
+if [ `$echo $sver | grep -ci "VNMRJ VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ $version$revision"
+  vnmrj=1
+elif [ `$echo $sver | grep -ci "VNMRJ_LX VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ_LX $version$revision"
+  vnmrj=1
+elif [ `$echo $sver | grep -ci "VNMRJ_MAC VERSION"` -eq 1 ]; then
+  version=`$echo $sver | cut -d ' ' -f3`
+  revision=`$echo $sver | cut -d ' ' -f5`
+  vnmr_rev="VnmrJ_MAC $version$revision"
+  vnmrj=1
+else
+  version=`$echo $sver | cut -d ' ' -f2`
+  revision=`$echo $sver | cut -d ' ' -f4`
+  vnmrj=`$echo $version | grep -ci vj`
+  if [ $vnmrj -eq 0 ]; then
+    vnmr_rev="VNMR $version$revision"
+  else
+    vnmr_rev="VnmrJ $version$revision"
+  fi
+fi
+
+#-----------------------------------------------------------------
+# NOW DO THE INSTALLATION
+#-----------------------------------------------------------------
+cd merge2d
+$echo "Recompiling C program ... \c"
+cc -O -o bin/merge2d.new source/merge2d.c
+if [ -x bin/merge2d.new ]; then
+  $echo " compilation successful"
+  rm -f bin/merge2d
+  mv bin/merge2d.new bin/merge2d
+  chmod 755 bin/merge2d
+else
+  $echo " recompilation failed, using precompiled module"
+fi
+cd ..
+dir=`$pwd`
+cd /vnmr
+vnmrdir=`$pwd`
+if [ $dir = $vnmrdir ]; then
+  $echo "Installing \"merge2d\" in \"/vnmr\" -"
+  bintarget=/vnmr/bin/merge2d
+else
+  $echo "Doing a local installation -"
+  cd $dir
+  cd merge2d
+  tar cf - bin | (cd $HOME; tar xfBp -)
+  rm -rf bin
+  bintarget=$HOME/bin/merge2d
+fi
+version=`$bintarget -v 2>/dev/null`
+cd $dir
+cd merge2d
+tar cf - * | (cd ..; tar xfB -)
+cd ..
+rm -rf merge2d.install merge2d
+if [ "$version"  != "" ]; then
+  $echo "Installed version:"
+  $echo "        $version"
+else
+  $echo "You MUST recompile the program \"source/merge2d.c\" first!"
+fi
+$echo ""

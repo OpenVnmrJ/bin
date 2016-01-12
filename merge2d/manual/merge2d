@@ -1,0 +1,76 @@
+
+*******************************************************************************
+  merge2d - merge 1D traces into a 2D fid			(C program)
+*******************************************************************************
+
+The C program /vnmr/bin/merge2d was written to repair "defective" traces in
+a 2D fid. Such traces (as they can be obtained due to magnet environment /
+homogeneity changes, sudden temperature changes, spurious floor vibrations
+etc.) can be reacquired as single or arrayed 1D data sets (one experiment
+per consecutive series of bad fids) and "merged" into the 2D fid. "merge2d"
+copies as many fids as it finds in the (arrayed) 1D data set. The data size
+and type (i.e.: 16- vs. 32-bit data, integer vs. floating point ("dsp='i'",
+or data from systems with DirectDrive(tm) architecture) must of course match.
+
+Syntax:		merge2d fulldataset newdataset startingincrement
+                merge2d -v
+
+Description:	The program is located in /vnmr/bin. It copies the data part
+		(not the headers) of a single or arrayed 1D fid ("newdataset")
+		into a complete 2D fid ("fulldataset"), starting at a given
+		trace number ("startingincrement").
+
+		Arguments:
+		  - fulldataset, newdataset: fid files (*.fid/fid or
+		    ~/vnmrsys/expn/acqfil/fid, NOT *.fid!)
+		  - startingincrement: trace number from which fid replace-
+		    ment starts.
+		  - "-v" prints the version of the program and exits (no
+		    action is performed, so other arguments are ignored).
+
+		Note that "merge2d" permanently modifies a data set - it
+		is advisable to keep backup of the original data.
+
+
+Step-by-step guide:
+===================
+
+You have detected problems in a 2D data set (heavily rolling baseline, maybe
+phasing is impossible). Use "df2d dconi" or better "wft dssa" and "ds(n)" to
+locate the faulty trace(s). Write down the trace number (s_tr) and the number
+of bad traces (n_tr), then move the parameters into a new experiment:
+	svf('faulty_2d')
+	svf('faulty_2d.bk')
+	mp(x,y)
+	jexp(y)
+
+For an absolute value (or TPPI) data set you can now proceed as follows:
+	ni=0
+	array('d2',n_tr,(s_tr-1)/sw1,1/sw1) go
+	...
+	svf('new_traces')
+
+For a hypercomplex data set with a single bad trace you have to set the
+parameters a bit differently:
+	ni=0
+	phase=1		[ for an "even" trace set phase=2 ]
+	d2=(s_tr-1)/(2*sw1) go
+			[ for an "even" trace use (s_tr-2) ]
+	...
+	svf('new_traces')
+
+For a hypercomplex data set with several subsequent faulty traces you will
+have to start at an odd trace number (decrement s_tr if necessary), and you
+will have to acquire an even number of traces. Set n_tr to cover all (sub-
+sequent) bad traces:
+	ni=0
+	(phase=1,2)
+	array('d2',n_tr/2,(s_tr-1)/(2*sw1),1/sw1) array='d2,phase' go
+        ...
+        svf('new_traces')
+
+Now you can "repair" the 2D fid:
+	shell('merge2d faulty_2d.fid/fid new_traces.fid/fid (s_tr)')
+
+Alternatively you can do this operation from a UNIX window:
+	merge2d faulty_2d.fid/fid new_traces.fid/fid s_tr
