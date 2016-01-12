@@ -1,0 +1,214 @@
+"***********************************"
+" rephasefid - rephase FID trace(s) "
+"***********************************"
+
+" Usage:  rephasefid(<'-d',><FID,>degrees<,start<,end<,spacing>>>) "
+"         rephasefid('-v')                                         "
+
+" started: 2006-02-10   r.kyburz "
+
+
+"-----------------------------------------------------------------------------"
+" DEFAULTS, VARIABLES                                                         "
+"-----------------------------------------------------------------------------"
+
+$arg = 1
+$debug = 0
+$degs=0
+$localfid = 1
+$firstfid = 1
+$lastfid = arraydim
+$spacing = 1
+$fid = curexp+'/acqfil/fid'
+
+
+
+"-----------------------------------------------------------------------------"
+"  ARGUMENT CHECKING                                                          "
+"-----------------------------------------------------------------------------"
+
+" first check for '-v' argument "
+if ($#>0) then
+  if (typeof('$1')) then
+    if (($1 = '-v') or ($1 = '-version')) then
+
+      " print version and exit "
+      shell('rephasefid -v'):$vers
+      write('line3','UNIX/C executable:  %s',$vers)
+      return
+    endif
+  endif
+endif
+
+
+" Must have at least one argument "
+"---------------------------------"
+if ($# = 0) then
+  write('error',
+	'Usage:  %s(<\'-d\',><FID,>degrees<,start<,end<,spacing>>>)',$0)
+  return
+endif
+
+
+" check for '-d' / '-debug' argument "
+"------------------------------------"
+if (typeof('$1')) then
+  if (($1 = '-d') or ($1 = '-debug')) then
+    $debug = 1
+    $arg = 2
+  endif
+endif
+
+if ($# < $arg) then
+  if ($debug) then
+    write('error',
+	  'Usage:  %s(\'-d\',<FID,>degrees<,start<,end<,spacing>>>)',$0)
+  else
+    write('error',
+	  'Usage:  %s(<\'-d\',><FID,>degrees<,start<,end<,spacing>>>)',$0)
+  endif
+  return
+endif
+
+
+" check for FID name argument "
+"-----------------------------"
+$argstr = ''
+format($arg,1,0):$argstr
+if (typeof('$'+$argstr)) then
+  $localfid = 0
+  $lastfid = 1e6
+  $arg = $arg + 1
+  $expfid = 0
+  $first3 = ''
+  $rem = ''
+  $len = 0
+  $filearg = ${$argstr}
+  length($filearg):$len
+  if $len>3 then
+    substr($filearg,1,3):$first3
+    substr($filearg,4,128):$rem
+    format($rem,'isreal'):$isr  "1 isreal, 0 is string"
+    if ($first3 = 'exp') and ($isr) then
+      exists(userdir + '/' + $filearg, 'directory'):$eexp
+      if $eexp then
+        $fid = userdir + '/' + $filearg + '/acqfil/fid'
+        $expfid = 1
+	jexp:$expnum,$expstr
+	if $expstr=$filearg then
+	  flush
+	endif
+      else
+        write('error', '%s:  "%s" is not a valid experiment!', $0, $filearg)
+        return
+      endif
+    endif
+  endif
+  if not($expfid) then
+    exists($filearg,'directory'):$e
+    if $e then
+      $fid = $filearg+'/fid'
+    else
+      exists($filearg+'.fid','directory'):$e
+      if $e then
+        $fid = $filearg+'.fid/fid'
+      else
+        write('error',
+	      '%s:  FID argument must be a VnmrJ/VNMR FID ("*.fid") file!',$0)
+        return
+      endif
+    endif
+  endif
+else
+  flush
+endif
+
+
+" Check accessibility of FID file "
+"---------------------------------"
+exists($fid, 'file'):$efid
+if not($efid) then
+  write('error', '%s:  Can\'t read FID file %s', $0, $fid)
+  return
+endif
+
+
+" Make sure remaining arguments are numeric "
+"-------------------------------------------"
+$ok = 1
+$ix = $arg
+$ixstr=''
+repeat
+  format($ix,1,0):$ixstr
+  if (typeof('$'+$ixstr)) then
+    $ok = 0
+  endif
+  $ix = $ix + 1
+until $ix > $#
+
+$degr_arg = $arg
+format($degr_arg,1,0):$argstr
+$degs = ${$argstr}
+if $# > $degr_arg then
+  format($degr_arg + 1,1,0):$argstr
+  $firstfid = ${$argstr}
+endif
+if $# > ($degr_arg + 1) then
+  format($degr_arg + 2,1,0):$argstr
+  $lastfid = ${$argstr}
+endif
+if $# > ($degr_arg + 2) then
+  format($degr_arg + 3,1,0):$argstr
+  $spacing = ${$argstr}
+endif
+
+if (($# < $arg) or (not($ok)) or ($lastfid < $firstfid) or ($spacing < 1)) then
+  $adderr=' '
+  if ($lastfid < $firstfid) then
+    $adderr=$adderr + ' [end > start]'
+  endif
+  if ($lastfid < $firstfid) then
+    $adderr=$adderr + ' [spacing >= 1]'
+  endif
+
+  if $localfid then
+    if ($debug) then
+      write('error',
+            'Usage:  %s(\'-d\',degrees<,start<,end<,spacing>>>) %s',
+	    $0, $adderr)
+    else
+      write('error',
+            'Usage:  %s(<\'-d\',>degrees<,start<,end<,spacing>>>) %s',
+	    $0, $adderr)
+    endif
+  else
+    if ($debug) then
+      write('error',
+            'Usage:  %s(\'-d\',FID,degrees<,start<,end<,spacing>>>) %s',
+	    $0, $adderr)
+    else
+      write('error',
+            'Usage:  %s(<\'-d\',>FID,degrees<,start<,end<,spacing>>>) %s',
+	    $0, $adderr)
+    endif
+  endif
+  return
+endif
+
+
+
+"-----------------------------------------------------------------------------"
+"  DO THE FID REPHASING                                                       "
+"-----------------------------------------------------------------------------"
+
+if ($debug) then
+  shell('rephasefid -d', $fid, $degs, $firstfid, $lastfid, $spacing, '2>&1')
+else
+  $ret=''
+  shell('rephasefid', $fid, $degs, $firstfid, $lastfid, $spacing, '2>&1'):$ret
+  if $ret = '' then
+    write('line3', 'FID trace(s) in %s rephased', $fid)
+  else
+    write('line3', 'rephasefid feedback:  %s', $dum)
+  endif
+endif

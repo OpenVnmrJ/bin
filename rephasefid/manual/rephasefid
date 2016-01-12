@@ -1,0 +1,133 @@
+
+*******************************************************************************
+  rephasefid - Rephase FID Traces                                         (M)
+  rephasefid - Rephase FID Traces                          (UNIX / C program)
+*******************************************************************************
+
+The "rephasefid" macro calls a utility (C program) "bin/rephasefid", which
+allows to change the absolute phase (zero order phase) of any FID or a
+specified set of FID traces in an arrayed 1D or any nD data set (e.g., a 2D
+FID) by any phase angle. There are several situations where such a phase
+change may be required or desired:
+  - Pulse sequences with old-fashioned phase cycling for hypercomplex
+    acquisition can be made compliant with standard / default "wft2da"
+    processing;
+  - There have been rare instances where an instrumental instability required
+    phase corrections on individual FID traces. The program was designed to
+    rescue valuable data - you should of course still involve service if you
+    have such problems!
+  - If a 2D FID was repaied using the "bin/merge2d" utility from the User
+    Library, such merged FID traces may also require individual phase
+    corrections;
+  - Certain types of imported nD FIDs from other manufacturers (States-TPPI?)
+    may require phase correcting a subset of the FID traces (typically every
+    even trace) to make the data processable with "ft2d" / "wft2d".
+
+===============================================================================
+
+MACRO:
+------
+
+Syntax:  rephasefid(<'-d<ebug>, '<FID,> degrees <, start<, end<, spacing>>>)
+         rephasefid('-v<ersion>')
+
+Description:    For the general argument description see the manual for the
+		C / UNIX utility below.
+		The "rephasefid" macro add some extra features:
+		 - the FID file specified in the macro is the VnmrJ / VNMR
+		   FID directory ("*.fid"), it is not necessary (but possible)
+		   to specify the ".fid" extension.
+		 - if no FID file is specified, the macro assumes the FID in
+		   the current VnmrJ / VNMR experiment. Experiments other than
+		   the current one can be specified with "'exp2'", "'exp17'",
+		   etc.
+		Note that the debugging mode needs to be specified as separate
+		argument "'-d'" - this argument needs to precede the other
+		arguments. Debugging output is routed to the text panel, i.e.,
+		in VnmrJ you need switch to the "Process" -> "Text output"
+		panel to see the output.
+
+Examples:       rephasefid('-v')
+		rephasefid(-84)
+		rephasefid(90,2,arraydim,2)
+		rephasefid('exp8',-123)
+		rephasefid('-d','my2dfid.fid',13,6,6)
+		rephasefid('-d','my2dfid',13,6,6)
+		rephasefid('-d','my2dfid',90,2,100000,2)
+
+===============================================================================
+
+C PROGRAM:
+----------
+
+Syntax:         rephasefid <-d<ebug>> FID degrees \
+                           <start_trace <end_trace <spacing>>>
+
+Description:    The program "bin/rephasefid" is typically installed in
+                "/vnmr/bin". It allows to change the absolute phase (zero
+                order phase) of any FID or a specified set of FID traces in
+                an arrayed 1D or any nD data set (e.g., a 2D FID) by any
+                angle. There are several situations where such a phase change
+                may be required or desired:
+                 - Pulse sequences with old-fashioned phase cycling for
+                   hypercomplex acquisition can be made compliant with
+                   standard / default "wft2da" processing;
+                 - There have been rare instances where an instrumental
+                   instability required phase corrections on individual FID
+                   traces. The program was designed to rescue valuable data -
+                   you should of course still involve service if you have such
+                   problems!
+                 - If a 2D FID was repaied using the "bin/merge2d" utility
+                   from the User Library, such merged FID traces may also
+                   require individual phase corrections;
+                 - Certain types of imported nD FIDs from other manufacturers
+                   (States-TPPI?) may require phase correcting a subset of the
+                   FID traces (typically every even trace) to make the data
+                   processable with "ft2d" / "wft2d".
+
+                Arguments:
+                - "-d" / "-debug": turns on debugging mode / verbose output
+                        for diagnosing problems; by default, "rephasefid"
+                        works silently.
+                 - FID: the actual FID disk file, NOT the "*.fid" directory
+                        (i.e., "*.fid/fid" or "~/vnmrsys/expN/acqfil/fid")
+                 - degrees: rotation angle in degrees: any phase angle is
+                        permitted (with angles in 90 degrees steps between
+                        -360 and 360 degrees simple rearrangements are used,
+                        not involving sin/cos calculations, avoiding floating
+                        point roundoff errors).
+                 - start_trace: starting trace (FID) to which correction
+                        applies (default: FID #1)
+                 - end_trace: last trace to which correction applies
+                        (default: last FID); you may specify a large integer
+                        (e.g., 32000) to specify the spacing without looking
+                        up how many FID traces there are.
+                 - spacing: increment between corrected FIDs (default: 1)
+
+                NOTE: "rephasefid" PERMANENTLY changes the actual FID disk
+                file - one can undo such a modification by switching the sign
+                of the "degrees" argument, while keeping the other arguments.
+                Don't modify the FID in the current or a running experiment.
+
+Examples:       rephasefid new_2d.fid/fid 90 2 1024 2
+                        Changes the phase of the "phase=2" FIDs in a
+                        hypercomplex 2D data set by 90 degrees; this would
+                        change the coefficients for "wft2d" as follows:
+                          wft2d(1,0,0,0,0,0,-1,0) -> wft2d(1,0,0,0,0,0,0,1)
+                          wft2d(1,0,0,0,0,0,0,1)  -> wft2d(1,0,0,0,0,0,1,0)
+                          wft2d(1,0,0,0,0,0,1,0)  -> wft2d(1,0,0,0,0,0,0,-1)
+                          wft2d(1,0,0,0,0,0,0,-1) -> wft2d(1,0,0,0,0,0,-1,0)
+
+                rephasefid new_2d.fid/fid 180 2 1024 2
+                        Changes the phase of the "phase=2" fids in a
+                        hypercomplex 2D data set by 180 degrees; this would
+                        change the coefficients for "wft2d" as follows:
+                          wft2d(1,0,0,0,0,0,-1,0) <-> wft2d(1,0,0,0,0,0,1,0)
+                          wft2d(1,0,0,0,0,0,0,1)  <-> wft2d(1,0,0,0,0,0,0,-1)
+
+                rephasefid tocsy.fid/fid -47.2 137 137
+                        Changes the phase of FID #137 by -47.2 degrees (the
+                        "rp" parameter for spectrum #137 will be lowered by
+                        47.2 degrees).
+
+===============================================================================
