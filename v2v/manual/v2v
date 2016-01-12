@@ -1,0 +1,25 @@
+*******************************************************************************
+ v2v - Varian to Varian data converter
+*******************************************************************************
+
+      Syntax: v2v filename.fid <-format <-v<erbose>>>
+
+ Description: Converts Varian FID files to double precision integer,
+              single precision integer or floating point formats.
+	      "v2v" stores the original FID as "fidname.fid.orig".
+
+   Arguments: filename.fid  FID file to be converted
+              -format 	    target file format. "format" is one of the
+			    following output options :
+           			d - double precision, 
+           			s - single precision, 
+           			f - floating point, and
+           			r - restores the original data.
+           		    The default output format is "-d".
+	      -verbose      Turns on "verbose" option     
+	      -v	    Same as "-verbose" option
+
+    Examples: v2v myfid.fid -d
+	      v2v myfid.fid -s
+	      v2v myfid.fid -f -v
+	      v2v myfid.fid -r -verbose
