@@ -1,0 +1,119 @@
+" bruspec2var - Import 1D Bruker Spectrum into VnmrJ / VNMR "
+
+if $#>1 then
+  if $2='swap' then
+    $swap=1
+  elseif $2='noswap' then
+    $swap=0
+  else
+    write('error','Usage:  %s(\'bru_spec\'<,\'noswap\'|\'swap\'>)', $0)
+    return
+  endif
+else
+  $swap=-1
+endif
+if $#=0 then
+  write('error','Usage:  %s(\'bru_spec\'<,\'noswap\'|\'swap\'>)', $0)
+  return
+endif
+
+$real=''
+$imag=''
+exists($1,'file'):$e
+if not($e) then
+  write('error','%s:  file %s not found', $0, $1)
+  return
+else
+  $basename=''
+  shell('basename',$1):$basename
+  $ok=0
+  if $basename='1r' then
+    $real=$1
+    length($1):$len
+    substr($1,1,$len-1):$imag
+    $imag=$imag+'i'
+    exists($real,'file'):$er
+    exists($imag,'file'):$ei
+    if $er>0 then
+      $ok=1
+    endif
+  elseif $basename='1i' then
+    $imag=$1
+    length($1):$len
+    substr($1,1,$len-1):$real
+    $real=$real+'r'
+    exists($real,'file'):$er
+    exists($imag,'file'):$ei
+    if $er>0 then
+      $ok=1
+    endif
+  else
+    $real=$1+'/1r'
+    $imag=$1+'/1i'
+    exists($real,'file'):$er
+    exists($imag,'file'):$ei
+    if $er>0 then
+      $ok=1
+    else
+      $real=$1+'/1/1r'
+      $imag=$1+'/1/1i'
+      exists($real,'file'):$er
+      exists($imag,'file'):$ei
+      if $er>0 then
+        $ok=1
+      else
+        $real=$1+'/pdata/1/1r'
+        $imag=$1+'/pdata/1/1i'
+        exists($real,'file'):$er
+        exists($imag,'file'):$ei
+        if $er>0 then
+          $ok=1
+        endif
+      endif
+    endif
+  endif
+endif
+if not($ok) then
+  write('error',
+        '%s - arg: directory with a Bruker 1D spectrum (1r & 1i parts)',$0)
+  return
+endif
+
+if (arraydim > 1) then
+  setup('H1','CDCl3')
+  shell('rm -f',curexp+'/acqfil/*'):$dum
+  groupcopy('current','processed','acquisition')
+  groupcopy('current','processed','processing')
+  $setnp=1
+else
+  setprotect('lp','off',4)
+  setprotect('rp','off',4)
+  setprotect('dmg','off',4)
+  $setnp=0
+endif
+
+vs=100
+
+if ($ei>0) then ph else av endif
+lp=0 rp=0
+flush
+if $swap=-1 then
+  shell('bruspec2var',$real,curexp+'/datdir/ 2>&1')
+elseif $swap=1 then
+  shell('bruspec2var -swap',$real,curexp+'/datdir/ 2>&1')
+else
+  shell('bruspec2var -noswap',$real,curexp+'/datdir/ 2>&1')
+endif
+
+" read fn from file size "
+$fn = 0
+shell('wc -c <',curexp+'/datdir/phasefile; cat'):$fn
+$fn = $fn - (32 + 28)
+$fn = $fn/2
+setvalue('fn',$fn)
+if ($setnp) or (np>fn) or (np<fn/4) then
+  setvalue('np',$fn/2)
+  setvalue('at',2*np/sw)
+endif
+groupcopy('current','processed','acquisition')
+groupcopy('current','processed','processing')

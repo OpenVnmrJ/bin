@@ -1,0 +1,126 @@
+*******************************************************************************
+ bruspec2var - Import Bruker 1D Spectrum to VnmrJ / VNMR  (M)
+*******************************************************************************
+
+ Syntax:      bruspec2var('bruker_data'<,'noswap'>)
+
+ Description: "bruspec2var" reads a transformed Bruker 1D spectrum (AMX /
+              XWINNMR format) into a VnmrJ / VNMR experiment ("datdir/data"
+              and "datdir/phasefile").
+              "fn" is set from the file size, "vs" is set to 100, the display
+              is switched to absolute intensity ("ai") mode, other parameters
+              are NOT SET. If you also have the corresponding Bruker 1D FID,
+              you FIRST may want to convert the FID using "convertbru" (this
+              way, you should have most parameters correct), THEN call
+              "bruspec2var".
+
+              "bruspec2var" calls a compiled C program "bin/bruspec2var". As
+              Bruker data normally have different byte order than data on Sun
+              (or Apple Macintosh) computers, "bruspec2var" normally swaps the
+              bytes when reading the Bruker data. The byte swapping can be
+              suppressed, see the description for the "'noswap'" argument
+              below. Conversely, on PC / Linux architectures, the program
+	      assumes that byte-swapping is not required - however, on these
+	      systems byte-swapping can be enforced with an extra "'swap'"
+	      argument.
+
+ Arguments:   "bruker_data" is the path (relative or absolute) to  the
+              transformed Bruker dataset. You can specify
+                - the real or imaginary part of the spectrum, e.g.,
+                  "10/pdata/1/1r" or "10/pdata/1/1i"
+                - the path to the directory containing the "1r" and "1i"
+                  components
+                - the parent path to the above - in this case, the program
+                  looks for subfiles "1/1r" and "1/1i"
+                - the parent path to the above - in this case, the program
+                  looks for subfiles "pdata/1/1r" and "pdata/1/1i"
+	      If the imaginary component ("1i" file) is missing, the spectrum
+	      is converted as real-only (imaginary part is identical to the
+	      real part).
+	      
+              "'noswap'" suppresses the byte swapping, "'swap'" enforces it.
+	      Typically, Bruker data (acquired on an SGI or a PC spectrometer
+	      host) does not have the same byte order as binary files on a
+	      SPARC-based Sun workstation or on Apple Macintosh computers.
+	      When run in SPARC/Solaris or PowerPC/MacOS X environments,
+	      "bruspec2var" will swap the bytes by default; on the other hand,
+	      in PC/Linux the proigram assumes that byte-swapping is NOT
+	      required. An extra "'noswap'" and "'swap'" argument permits
+              overriding this default behavior. If the byte order is wrong,
+	      the resulting spectrum will look heavily distorted or be
+	      complete garbage.
+
+ Examples:    bruspec2var('10/pdata/1/1r')
+              bruspec2var('10/pdata/1/1i','noswap')
+              bruspec2var('10/pdata/1')
+              bruspec2var('10/pdata/1','noswap')
+              bruspec2var('10/pdata')
+              bruspec2var('10/pdata','noswap')
+              bruspec2var('10')
+              bruspec2var('10','noswap')
+
+ Related: bruspec2var - Create "phasefile" & "data" from Bruker 1D Spectrum (U)
+          convertbru - Convert Bruker Data
+
+
+*******************************************************************************
+ bruspec2var - Create "phasefile" and "data" from Bruker 1D Spectrum (U)
+*******************************************************************************
+
+ Syntax:      bruspec2var <-d> <-noswap|-swap> Bruker_dir <targetpath>
+              bruspec2var -v
+
+ Description: "bruspec2var" creates VnmrJ / VNMR "datdir/data" and
+              "datdir/phasefile" from a transformed Bruker 1D dataset. The
+              resulting phasefile can be imported into VNMR / VnmrJ using the
+              macro "bruspec2var".
+
+ Arguments:   "Bruker_dir": path to a directory containing a transformed
+              Bruker 1D spectrum ("1r" and "1i" component files). If the
+	      imaginary component ("1i" file) is missing, the spectrum is
+	      converted as real-only (imaginary part identical to real part).
+              "source/bruspec2var.c" is a C program that can be compiled with
+                        cc -O -o /vnmr/bin/bruspec2var bruspec2var.c
+              or (for a local installation)
+                        cc -O -o ~/bin/bruspec2var bruspec2var.c
+
+              "targetpath": Optional path to a directory in which the files
+              "data" and "phasefile" are created, that can afterwards be
+              imported into VNMR / VnmrJ using "bruspec2var"; ideally,
+              "targetpath" is the subdirectory "datdir" in the target
+              (current) VnmrJ / VNMR experiment. If no target path is
+              specified, these two will be created in the directory with the
+              Bruker 1D spectrum files (if writable).
+
+              On Sun / SPARC and Mac / PowerPC architectures, the program 
+              assumes that the Bruker data need to be byte-swapped; the
+              "-noswap" option suppresses the byte swapping, in case the
+              Bruker data are delivered byte-swapped already.
+              Conversely, on PC / Linux architectures, the program assumes
+              that byte-swapping is not required - however, on these systems
+              byte-swapping can be enforced with the "-swap" argument.
+
+              The "-d" or "-debug" option is for debugging ONLY and produces
+              VERY VERBOSE output about the conversion process.
+
+              The "-v" option causes "bruspec2var" to print out the version
+              number / data and exit.
+
+ Examples:    bruspec2var 1/pdata/1 $vnmruser/exp3/datdir
+              bruspec2var 1/pdata/1 $HOME/vnmrsys/exp3/datdir
+              bruspec2var 1/pdata/1 $HOME/vnmrsys/exp3/datdir
+              bruspec2var 1/pdata/1
+              bruspec2var -noswap 1/pdata/1 $vnmruser/exp3/datdir
+              bruspec2var -noswap 1/pdata/1 $HOME/vnmrsys/exp3/datdir
+              bruspec2var -noswap 1/pdata/1 $HOME/vnmrsys/exp3/datdir
+              bruspec2var -noswap 1/pdata/1
+              bruspec2var -swap 1/pdata/1 $vnmruser/exp3/datdir
+              bruspec2var -swap 1/pdata/1 $HOME/vnmrsys/exp3/datdir
+              bruspec2var -d -swap 1/pdata/1 $HOME/vnmrsys/exp3/datdir
+              bruspec2var -swap 1/pdata/1
+	      bruspec2var -v
+
+ Related:     bruspec2var - Import Bruker 1D Spectrum to VnmrJ / VNMR  (M)
+
+===============================================================================
+
