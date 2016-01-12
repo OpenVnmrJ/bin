@@ -1,0 +1,79 @@
+
+*******************************************************************************
+  pcosyproc - process P.COSY type fid		(macro / C program)
+*******************************************************************************
+
+The pcosyproc macro calls a utility (C program) /vnmr/bin/pcosyproc, which
+processes a P.COSY (i.e. cosyps) data set according to literature (see
+D.Marion & A.Bax, J.Magn.Reson. 80, 528 (1988) ) by subtracting a 1D
+spectrum (1st trace of cosyps with read pulse replaced by a delay) from
+each trace, left-shifted by one data point per t1 dwell time.
+If the 1D trace is shorter than np(2D)+2*ni points, it is zerofilled
+automatically (typically it is the same size as the 2D fids, but it can
+be any length for pcosyproc).
+
+For arrayed 2D spectra (as for hypercomplex acquisition with phase=1,2) an
+arrayed 1D spectrum should be acquired with the same pulse sequence (ni=0
+phase=1,2), but with the last pulse either replaced by a delay of
+2.0/3.14156*pw (correction for the precession during the last pulse), or
+alternatively with the last pulse replaced by a pair of half-pulses with
+opposite phase (a "non-pulse"). A modified version of the cosyps pulse
+sequence should be used for that purpose (the phased cycling should be
+identical to the phase cycling in the 2D sequence).
+
+It is recommended to use a higher number of transients (16-fold) in the 1D
+spectrum, in order not to increase the noise in the resulting 2D spectrum.
+'pcosyproc' will scale down the 1D fid accordingly for the subtraction.
+
+Note that for 'pcosyproc' to work the 2D data set must comply with the
+"standard wft2da" convention, i.e., 'wft2da' must be usable without the
+argument 'old'; if this is not the case, you must first use the program
+"rephasefid" - see man('rephasefid') - to make BOTH 1D and 2D data sets
+follow this convention: the same phase correction must be applied to
+every even fid in both the 2D and the 1D data set.
+
+
+MACRO:
+------
+
+Syntax:		pcosyproc(1D_exp#<,2D_file>)		OR
+		pcosyproc(1D_exp#<,2D_exp#>)		OR
+		pcosyproc(1D_datafile<,2D_file>)	OR
+		pcosyproc(1D_datafile<,2D_exp#>)
+
+Description:	pcosyproc PERMANENTLY MODIFIES THE SPECIFIED 2D FID; it is
+		recommended to first create a backup copy of the original
+		2D fid file. Both the 1D and the 2D data files can be
+		either disk files or experiment mumbers. With file names
+		the ".fid" extention may or may not be attached. By default
+		the macro will modify the data set in the current experiment.
+		The macro will issue a warning if the two fids specified
+		are identical. It will abort if one of the files cannot be
+		found, and with one argument (2D fid is local) the macro
+		also checks whether a proper 2D data set (ni>1, sw1 exists)
+		is present. It will finally report the two fid file names
+		and ask for confirmation before initiating the (irreversible)
+		processing.
+
+Examples:	pcosyproc(1)
+		pcosyproc('fid1d')
+		pcosyproc('fid1d.fid')
+		pcosyproc(1,4)
+		pcosyproc(1,'fid2d')
+		pcosyproc('fid1d',4)
+		pcosyproc('fid1d','fid2d')
+
+
+C Program:
+----------
+
+Syntax:		pcosyproc 2D_fid 1D_fid
+
+Description:	the program is located in /vnmr/bin. It takes two file names
+		as arguments; note that the order of the arguments is reversed
+		compared to the macro. /vnmr/bin/pcosyproc does not check on
+		data types etc., it will only report problems with the file
+		access.
+
+Examples:	/vnmr/bin/pcosyproc fid1d.fid/fid $vnmruser/exp3/acqfil/fid
+		pcosyproc /home/vnmr1/vnmrsys/exp1/acqfil/fid fid2d.fid/fid

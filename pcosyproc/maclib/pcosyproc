@@ -1,0 +1,121 @@
+" @(#)pcosyproc 8.1 2/5/93 Copyright (c) 1991,1992 Varian Assoc.,Inc. All Rights Reserved "
+"****************************************"
+" pcosyproc - process P.COSY type 2D fid "
+"****************************************"
+
+" Usage:	pcosyproc(1D_exp#<,2D_file>) 		OR	"
+"               pcosyproc(1D_exp#<,2D_exp#>)            OR	"
+"               pcosyproc(1D_datafile<,2D_file>)        OR	"
+"               pcosyproc(1D_datafile<,2D_exp#>)		"
+
+" 91/12/09	r.kyburz "
+
+$fid1D=''
+$fid2D=''
+$ch=''
+
+" check for the number of arguments "
+if $#<1 then
+  write('error','Usage: pcosyproc(1Dfid<,2Dfid>) - args can be experiment numbers or disk files')
+  return
+endif
+
+" evaluate arguments "
+if $#>1 then
+  if ((typeof('$1'))and(typeof('$2')))or((not typeof('$1'))and(not typeof('$2'))) then
+    if $1=$2 then
+      write('error','Do you REALLY want the first 2D trace to be taken as 1D fid?')
+      input('Continue (y/n)? '):$ch
+      if $ch<>'y' then
+	return
+      endif
+    endif
+  endif
+  if typeof('$2') then	" arg2 was a string "
+    " make sure filename is *.fid/fid "
+    length($2):$len 
+    if $len<4 then 
+      $fid2D=$2+'.fid/fid' 
+    else 
+      substr($2,$len-3,4):$ch   
+      if $ch='.fid' then 
+	$fid2D=$2+'/fid' 
+      else
+	$fid2D=$2+'.fid/fid'
+      endif 
+    endif
+  else			" arg2 was experiment number "
+    " fid file is exp?/acqfil/fid "
+    format($2,1,0):$ch 
+    $fid2D=userdir+'/exp'+$ch+'/acqfil/fid'
+  endif
+else			" only one argument (1D file name) was given "
+  exists('ni','parameter'):$eni
+  exists('sw1','parameter'):$esw1
+  if ($eni<>1)or($esw1<>1) then
+    write('error','pcosyproc: current exp does not contain a 2D data set!')
+    return
+  else
+    if (ni<2)or(arraydim<2) then
+      write('error','pcosyproc: phase sensitive 2D data set is required!')
+      return
+    endif
+  endif
+  if (not typeof('$1')) then	" arg1 was a number "
+    " check whether arg1 is the current (2D) experiment "
+    jexp:$curexp
+    if $curexp=$1 then
+      write('error','Do you REALLY want the first 2D trace to be taken as 1D fid?')
+      input('Continue (y/n)? '):$ch
+      if $ch<>'y' then
+	return
+      endif
+    endif
+  endif
+  " default 2D experiment is the current experiment "
+  $fid2D=curexp+'/acqfil/fid'
+endif
+if typeof('$1') then	" arg1 was a string "
+  " make sure filename is *.fid/fid "
+  length($1):$len 
+  if $len<4 then 
+    $fid1D=$1+'.fid/fid' 
+  else 
+    substr($1,$len-3,4):$ch   
+    if $ch='.fid' then 
+      $fid1D=$1+'/fid' 
+    else
+      $fid1D=$1+'.fid/fid'
+    endif 
+  endif
+else			" arg1 was experiment number "
+  " fid file is exp?/acqfil/fid "
+  format($1,1,0):$ch 
+  $fid1D=userdir+'/exp'+$ch+'/acqfil/fid'
+endif
+exists($fid1D,'file'):$e
+if $e<0.5 then
+  write('error','pcosyproc: 1D file %s not found!',$fid1D)
+  return
+endif
+exists($fid2D,'file'):$e
+if $e<0.5 then
+  write('error','pcosyproc: 2D file %s not found!',$fid2D)
+  return
+endif
+write('alpha','')
+write('alpha','P.COSY / PE.COSY processing:')
+write('alpha','----------------------------')
+write('alpha','1D fid file is %s',$fid1D)
+write('alpha','2D fid file is %s',$fid2D)
+write('alpha','The 2D fid will be IRREVERSIBLY modified!')
+input('OK to continue with these conditions (y/n)? '):$ch
+if $ch<>'y' then
+  write('alpha','P.COSY processing aborted.')
+  return
+endif
+flush
+shell('/vnmr/bin/pcosyproc '+$fid2D+' '+$fid1D+' 2>&1; cat')
+write('alpha','')
+write('alpha','The 2D fid '+$fid2D+' has been modified.')
+write('error','')
