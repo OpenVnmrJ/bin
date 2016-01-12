@@ -1,0 +1,314 @@
+" @(#)combine2d 8.1 2/5/93 Copyright (c) 1991,1992 Varian Assoc.,Inc. All Rights Reserved "
+"******************************************************************"
+" combine2d - generate linear combinations of 2D (or 1D) data sets "
+"******************************************************************"
+
+" Usage:	combine2d(<'-float',>fid1,fid2<,target_fid<,multiplier>>) OR "
+"		combine2d(<'-float',>fid1,fid2<,target_exp#<,multiplier>>)   "
+"		fid1 and fid2 can be experiment numbers or fid files	     "
+
+" started: 91/12/05	r.kyburz "
+
+" initialize variables "
+$source1=''	" file names for UNIX command "
+$source2=''
+$target=''
+$source1file='' " source1 *.fid name "
+$targetfile=''	" target *.fid file name "
+$source1nr=0	" flags for objects being experiments (0 = disk file)	"
+$source2nr=0
+$targetnr=0
+$multiplier=-1	" default multiplier (for source2) is -1 (subtraction)	"
+$ch=''
+
+" check for the number of arguments "
+if ($#<2) then
+  write('error',
+	'Usage: combine2d(<\'-f<loat>\',>file1,file2<,target<,multiplier>>)')
+  return
+endif
+
+$s1arg=1
+$minarg=2
+$tofloat=0
+if typeof('$1') then
+  if ($1='-float')or($1='-f') then
+    $tofloat=1
+    $s1arg=2
+    $minarg=3
+  endif
+endif
+
+if (($#<$minarg) or ($#>$minarg+2)) then
+  write('error',
+        'Usage: combine2d(<\'-f<loat>\',>file1,file2<,target<,multiplier>>)')
+  return
+endif
+
+" evaluate arguments "
+$str=''
+if $#>$minarg then
+  format($s1arg+2,1,0):$str
+  if typeof('$'+$str) then	" arg3 was a string "
+    " make sure filename is *.fid/fid "
+    $str=${$str}
+    length($str):$len 
+    if $len<4 then 
+      $targetfile=$str+'.fid' 
+      $target=$str+'.fid/fid' 
+    else 
+      substr($str,$len-3,4):$ch	
+      if $ch='.fid' then 
+	$targetfile=$str
+	$target=$str+'/fid' 
+      else
+	$targetfile=$str+'.fid' 
+	$target=$str+'.fid/fid'
+      endif 
+    endif
+  else			" arg3 was experiment number "
+    " fid file is exp?/acqfil/fid "
+    $targetnr=${$str}
+    format($targetnr,1,0):$ch 
+    $targetfile=userdir+'/exp'+$ch
+    $target=$targetfile+'/acqfil/fid'
+  endif
+  if $#>$minarg+1 then
+    format($minarg+2,1,0):$str
+    if typeof('$'+$str) then
+      write('error',
+	'Usage: combine2d(<\'-f<loat>\',>file1,file2<,target<,multiplier>>)')
+      return
+    else
+      $multiplier=${$str}
+    endif
+  endif
+else			" only two arguments (source1, source2) were given "
+  " default target is exp5 "
+  $targetnr=5
+  $targetfile=userdir+'/exp5'
+  $target=$targetfile+'/acqfil/fid'
+endif
+format($s1arg,1,0):$str
+if typeof('$'+$str) then	" arg1 was a string "
+  " make sure filename is *.fid/fid "
+  $str=${$str}
+  length($str):$len 
+  if $len<4 then 
+    $source1file=$str+'.fid'
+    $source1=$str+'.fid/fid' 
+  else 
+    substr($str,$len-3,4):$ch   
+    if $ch='.fid' then 
+      $source1file=$str
+      $source1=$str+'/fid' 
+    else
+      $source1file=$str+'.fid'
+      $source1=$str+'.fid/fid'
+    endif 
+  endif
+else			" arg1 was experiment number "
+  " fid file is exp?/acqfil/fid "
+  $source1nr=${$str}
+  format($source1nr,1,0):$ch 
+  $source1file=userdir+'/exp'+$ch
+  $source1=$source1file+'/acqfil/fid'
+endif
+format($s1arg+1,1,0):$str
+if typeof('$'+$str) then	" arg2 was a string "
+  " make sure filename is *.fid/fid "
+  $str=${$str}
+  length($str):$len 
+  if $len<4 then 
+    $source2=$str+'.fid/fid' 
+  else 
+    substr($str,$len-3,4):$ch   
+    if $ch='.fid' then 
+      $source2=$str+'/fid' 
+    else
+      $source2=$str+'.fid/fid'
+    endif 
+  endif	 
+else			" arg2 was experiment number "
+  " fid file is exp?/acqfil/fid "
+  $source2nr=${$str}
+  format($source2nr,1,0):$ch 
+  $source2=userdir+'/exp'+$ch+'/acqfil/fid'
+endif
+
+" check on existence of source files "
+exists($source1,'file'):$e
+if $e<0.5 then
+  write('error','combine2d:  source file %s not acessible!',$source1)
+  return
+endif
+exists($source2,'file'):$e
+if $e<0.5 then
+  write('error','combine2d:  source file %s not acessible!',$source2)
+  return
+endif
+
+" make sure the target file is not identical with one of the sources "
+if $target=$source1 then
+  write('error','combine2d:  target file is identical with source file #1!')
+  return
+endif
+if $target=$source2 then
+  write('error','combine2d:  target file is identical with source file #2!')
+  return
+endif
+
+" if experiment is involved, make sure the disk is up to date "
+if ($source1nr>0)or($source2nr>0)or($targetnr>0) then
+  flush
+endif
+
+" report conditions, allow to abort "
+write('alpha','')
+write('alpha','2D LINEAR COMBINATIONS:')
+write('alpha','-----------------------')
+if $source1nr>0 then
+  write('alpha','source file #1 is exp%d',$source1nr)
+else
+  write('alpha','source file #1 is %s',$source1)
+endif
+if $source1nr>0 then
+  write('alpha','source file #2 is exp%d',$source2nr)
+else
+  write('alpha','source file #2 is %s',$source2)
+endif
+if $multiplier=-1 then
+  write('alpha','   source #2 will be subtracted from source #1')
+else
+  write('alpha','   source #2 will be multiplied by %7.4f',$multiplier)
+endif
+if $targetnr>0 then
+  write('alpha','target file is exp%d',$targetnr)
+else
+  write('alpha','target file is %s',$target)
+endif
+exists($target,'file'):$e
+if $e<0.5 then
+  if $targetnr>0 then
+    write('alpha','   target experiment (exp%d) will be created',$targetnr)
+  else
+    write('alpha','   target file will be created')
+  endif
+else
+  if $targetnr>0 then 
+    write('alpha','   experiment %d will be overwritten!',$targetnr)
+  else 
+    write('alpha','   target file will be overwritten!')
+  endif 
+endif
+input('OK to continue with these conditions (y/n) [n]? '):$ch
+if $ch<>'y' then
+  write('alpha','COMBINE2D processing aborted.')
+  return
+endif
+
+" check on existence of target file, create it if necessary;	"
+"    when present or created, initialize the target file, to	"
+"    ensure structure and parameter compatibility with source1	"
+"    (source2 incompatibility will be reported by the C program)"
+" First delete existing target data, if necessary "
+exists($target,'file'):$e
+if $e<0.5 then		" TARGET DOES NOT EXIST "
+  if $targetnr>0 then	" target is experiment "
+    shell('rm -rf '+$targetfile)
+    cexp($targetnr)
+  else			" target is fid file "
+    shell('rm -rf '+$targetfile)		" (just for safety) "
+    exists($targetfile,'file'):$e
+    if $e<0.5 then
+      shell('mkdir '+$targetfile)
+    endif
+  endif 
+else
+  shell('rm -rf '+$targetfile+'/fid')		" (just for safety) "
+  shell('rm -rf '+$targetfile+'/procpar')	" (just for safety) "
+endif 
+" Now initialize the target data "
+if $targetnr>0 then	" target is experiment "
+  if $source1nr>0 then		" source1 is experiment "
+    mf($source1nr,$targetnr)	" initialize target exp by moving fids "
+  else				" source1 is disk file "
+    jexp:$current
+    jexp($targetnr)
+    rt($source1file)		" initialize target exp by rt(source1) "
+    jexp($current)
+  endif
+else			" target is fid file "
+  if $source1nr>0 then		" source1 is experiment "
+    jexp:$current
+    jexp($source1nr)
+    svf($targetfile)		" initialize target by svf from source1 "
+    jexp($current)
+  else				" source1 is disk file "
+    exists($targetfile+'/text','file'):$e
+    if $e<0.5 then
+      shell('cp '+$source1file+'/text '+$targetfile)
+    endif
+    shell('cp '+$source1file+'/fid '+$targetfile)
+    shell('cp '+$source1file+'/procpar '+$targetfile)
+  endif				" initialize target by copying source1 "
+endif
+exists($target,'file'):$e
+if $e<0.5 then
+  write('error','combine2d:  could not create target file!')
+  return
+endif
+
+" NOW DO IT! "
+jexp:$current
+if $targetnr>0 then	" target is an experiment - make sure we're not there "
+  if $targetnr=$current then	" we ARE in the target experiment! "
+    if $targetnr>1 then		" if possible join exp1 "
+      jexp1
+    else			" target is exp1, and we are in it! "
+      $expbody=userdir+'/exp'
+      $ch=''
+      $ix=1			" find the next defined experiment "
+      repeat
+	$ix=1+$ix
+	format($ix,1,0):$ch
+	$expname=$expbody+$ch
+	exists($expname,'file'):$e
+      until ($ix=9)or($e>0.5)
+      if ($e<0.5)and($ix=9) then	" no other experiment found "
+	cexp(2)				" so we create exp2 and join it "
+	jexp2
+      else
+	jexp($ix)
+      endif
+    endif
+  endif
+endif
+$multstr=''
+format($multiplier,7,4):$multstr
+$res=''
+$cmd='/vnmr/bin/combine2d'
+if $tofloat then
+  $cmd=$cmd+' -float'
+endif
+$cmd=$cmd+' '+$source1+' '+$source2+' '+$target+' '+$multstr
+$cmd=$cmd+' 2>&1'
+$cmd=$cmd+' 1>/dev/null'
+shell($cmd):$res
+if $res<>'' then
+  write('error','%s',$res)
+  jexp($current)
+  return
+endif
+jexp($current)
+write('alpha','')
+if $targetnr>0 then
+  if $targetnr=$current then
+    write('alpha','The resulting fid is stored in the current experiment')
+  else
+    write('alpha','The resulting fid is stored in exp%d',$targetnr)
+  endif
+else
+  write('alpha','The resulting fid is stored as %s',$targetfile)
+endif
+write('error','')

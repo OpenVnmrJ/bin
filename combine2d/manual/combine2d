@@ -1,0 +1,123 @@
+*******************************************************************************
+  combine2d - Calculate Linear Combinations of 1D/2D FIDs  (macro / C program)
+*******************************************************************************
+
+The "combine2d" macro calls a utility (C program) "/vnmr/bin/combine2d", which
+calculates linear combinations of two 1D or 2D data sets. The two data sets
+of course must have identical structures ("np", "ni", "arraydim").
+If the source files are compressed or acquired with "dp='n'", "combine2d"
+will expand the result to 32-bit format. If either a fractional multiplier
+OR an optional first argument "-float" (UNIX) or "'-float'" (macro) are
+specified, the resulting FID will be created in floating point format, 
+irrespective of the format of the source FIDs.
+Downscaling (from large "nt" or from "compressfid") is reverted, UNLESS the 
+source FIDs are 32-bit integer ("dp='y'") and "-float" is NOT specified.
+The "ct" parameter on the other hand can well be different between the two
+fids - this may need to be taken care of through the multiplier; note that
+SPECTRA are always scaled by "1/ct", but FIDs are not!
+Applications: calculating sums and differences of FIDs, doing "2D mathematics".
+Limitations: does not allow for the source files to be elements of a single
+arrayed FID. For arrayed 2D spectra on the other hand this case is covered
+through the "wft2d" command, for arrayed 1D FIDs "add" / "sub" (or "addi")
+can be used.
+
+
+MACRO:
+------
+
+Syntax:		combine2d(<'-float',>source1,source2<,target<,multiplier>>)
+
+Description:	source1, source2 and target can be either disk files ("*.fid",
+		both "name" and "name.fid" are accepted as input) or experi-
+		ment numbers. The target cannot be identical with any of the
+		source files. If the target does not exist, it will be created
+		(both as experiment or as a disk file). In any case both the
+		target parameters and the target FID file structure will be
+		copied from the source file #1. The multiplier (argument #4)
+		allows to scale the source FID #2 - the default multiplier
+		is -1.0, which will produce the difference FID in the target
+		file. Any real or integer multiplier is permitted - integer or
+		floating point math will be applied accordingly.
+		[ To avoid mathematical overflow (with the FIDs being 32-bit
+		integer format) it is recommended to use multipliers smaller
+		than or equal to 1.0 - change the order of source1 & source2,
+		if necessary. Since on the other hand 32-bit FIDs will seldom
+		be "filled" (with a 16-bit ADC this takes at least 64k tran-
+		sients) it is quite unlikely that one runs into math overflow
+		issues. The "'-float'" argument avoids math overflow issues,
+		but the resulting FID may be incompatible with some third
+		party processing software. ]
+
+Examples:	combine2d('source1','source2.fid','target',-0.5)
+			( target = source1 - 0.5 * source2 )
+		combine2d('-float','source1','source2.fid','target',-0.5)
+                        ( target = source1 - 0.5 * source2 )
+		combine2d('source1',3,2)
+			( subtract exp3 from source1, put result in exp2 )
+		combine2d('-float','source1',3,2)
+			( subtract exp3 from source1, put result in exp2 )
+		combine2d('source1',3,2,1)
+			( add exp3 to source1, put result in exp2 )
+		combine2d(1,2)
+			( subtract exp2 from exp1, put result in exp5 )
+		combine2d('-float',1,2)
+			( subtract exp2 from exp1, put result in exp5 )
+
+
+C Program:
+----------
+
+Syntax:		combine2d <-d<ebug>> <-f<loat>> source1_fid source2 _fid \
+			target_fid <multiplier>
+		combine2d -v<ersion>
+
+Description:	The program is located in "/vnmr/bin". It takes the following
+		arguments:
+		 -version / -v  prints the source version and release date,
+				and exits (no action taken)
+		 -debug / -d    optional argument, meant for debugging ONLY;
+				switches on verbose output during processing
+		 -float / -f    optional, produces FID in "float" format,
+				irrespective of the format of the source FIDs
+		 source1_fid    source FID #1 (first "operand FID")
+		 source2_fid    source FID #2 (second "operand FID")
+		 target_fid     target FID (resulting FID), cannot be
+				identical with one of the source FIDs
+		 multiplier     optional, applied to "source2_fid" before
+				adding to "source1_fid"; default value: -1
+		All three FID arguments must be FID files ("*.fid/fid" or
+		"~/vnmrsys/exp[0-9]*/acqfil/fid"). The source FIDs (i.e.: the
+		file headers) are checked for compatibility, and the target
+		will be written with the file structure of "source1_fid" -
+		EXCEPTIONS:
+		 - if the source FIDs are 16-bit integer, the result will be
+		   in 32-bit integer format
+		 - if the "-float" argument or a fractional multiplier is
+		   specified, the result will be in 32-bit floating point
+		   ("float") format, irrespective of the format of the source
+		   FIDs.
+		"combine2d" checks whether the target is identical to one of
+		the source files, and aborts, if necessary. The multiplier
+		applies to "source2_fid". The default multiplier is -1.0,
+		i.e., subtracting "source2_fid" from "source1_fid"); any real
+		number is permitted (see above).
+		Integer or floating point math will be applied, as appropriate
+		(1.0 and -1.0 are recognized as integer multipliers).
+		The C program "combine2d" does NOT deal with parameter and
+		text files - it therefore is mandatory to create the target
+		file ("*.fid" or an experiment file) first (usually done by
+		copying one of the source files, or by calling "combine2d"
+		through the macro, see above).
+
+Examples:	combine2d s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d -float s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d -f s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d s1.fid/fid s2.fid/fid target.fid/fid -.532
+		combine2d ~/vnmrsys/exp1/acqfil/fid ~/vnmrsys/exp2/acqfil/fid \
+				~/vnmrsys/exp9/acqfil/fid
+		combine2d -debug s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d -d s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d -debug -float s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d -d -f s1.fid/fid s2.fid/fid target.fid/fid 1
+		combine2d -version
+		combine2d -v
